@@ -1,0 +1,85 @@
+.officer-dashboard-page {
+  padding: 2rem;
+  background-color: #f4f7f9;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+}
+
+.dashboard-title {
+  text-align: center;
+  margin-bottom: 2rem;
+  font-size: 2rem;
+  color: #333;
+}
+
+.card {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.analytics-section {
+  margin-bottom: 2rem;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.stat-box {
+  text-align: center;
+  flex: 1;
+  min-width: 150px;
+  margin: 0.5rem;
+  background-color: #eef2f7;
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.stat-box p {
+  margin: 0;
+  font-weight: bold;
+  color: #555;
+}
+
+.stat-box h2 {
+  margin: 0.5rem 0 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.chart-box {
+  margin-top: 1rem;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.year-group, .requirement-group {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #eef2f7;
+  border-radius: 6px;
+}
+
+.year-group h4, .requirement-group h4 {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.loading {
+  text-align: center;
+  font-size: 1.5rem;
+  margin-top: 2rem;
+}

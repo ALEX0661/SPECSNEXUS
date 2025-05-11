@@ -1,0 +1,160 @@
+/* src/styles/LoginPage.css */
+
+/* Import the desired fonts from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Konkhmer+Sleokchher&display=swap');
+
+/* Basic reset */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* Background styling for the login page */
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  background: url('../../public/images/background-image.png') center center no-repeat;
+  background-size: cover;
+}
+
+/* Header styles for the top-right login button */
+.header {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+/* Top-right Login Button */
+.login-button {
+  background-color: #4B5320; /* Army green */
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 50px; /* Oval shape */
+  cursor: pointer;
+  transition: background-color 0.3s;
+  font-size: 14px;
+  font-family: 'Konkhmer Sleokchher', sans-serif;
+}
+
+.login-button:hover {
+  background-color: #3a4218;
+}
+
+/* Modal Overlay */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* Modal Content Container - taller and wider */
+.modal-content {
+  background-color: #fff;
+  border-radius: 25px;
+  width: 325px;
+  min-height: 375px;
+  padding: 40px 30px;
+  position: relative;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  animation: slideDown 0.4s ease-out;
+  font-family: 'Konkhmer Sleokchher', sans-serif;
+
+  /* NEW: Flex layout for centering content */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+/* Slide-down animation */
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Welcome Title Styling */
+.welcome-title {
+  font-family: 'Dela Gothic One', cursive;
+  font-size: 2.5rem;
+  text-align: center;
+  margin-bottom: 45px;
+  color: #333;
+  margin-top: -10px;
+}
+
+/* Close Button Styling */
+.close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 28px;
+  color: #aaa;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #000;
+}
+
+/* Input field styling with oval shape */
+.modal-content input {
+  width: 100%;
+  padding: 10px 10px;
+  margin-bottom: 20px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 25px;
+  transition: border-color 0.2s;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: #4B5320;
+}
+
+/* Remove default button focus outline */
+button:focus {
+  outline: none;
+}
+
+/* Modal Login Button Styling - auto width */
+.modal-content button.modal-login-button {
+  width: 150px;
+  display: inline-block;
+  padding: 6px 20px; /* horizontal padding for a compact size */
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 5px;
+  background-color: #4B5320; /* Green background */
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.modal-content button.modal-login-button:hover {
+  background-color: #3a4218;
+}
+
+/* Error Message Styling */
+.error {
+  color: red;
+  text-align: center;
+  margin-bottom: 10px;
+}
