@@ -1,45 +1,173 @@
-.memberships-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
+/* MembershipPage.css */
+.membership-page {
+  padding: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.membership-header {
+  margin-bottom: 20px;
+}
+
+.membership-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.membership-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .membership-card {
-  background-color: #f9f9f9;
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.progress-bar-container {
-  background: #eee;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
+.membership-status,
+.membership-fee,
+.membership-description {
+  margin-bottom: 20px;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Status progress bar styles */
+.status-progress {
+  padding: 10px 0;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 33.33%;
+  position: relative;
+}
+
+.step-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  margin-bottom: 8px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #e0e0e0;
+}
+
+.progress-step.active .step-dot {
+  background-color: #2d3d33;
+  box-shadow: 0 0 0 2px #2d3d33;
+}
+
+.step-label {
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+}
+
+.progress-step.active .step-label {
+  color: #2d3d33;
+  font-weight: 600;
 }
 
 .progress-bar {
-  color: #fff;
-  text-align: center;
-  padding: 0.25rem 0;
-  font-weight: bold;
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  position: relative;
+  margin-top: -16px;
+  z-index: -1;
 }
 
-.membership-details p {
-  margin: 0.5rem 0;
+.progress-fill {
+  height: 100%;
+  background-color: #2d3d33;
+  border-radius: 2px;
+  transition: width 0.3s ease;
 }
 
-.register-btn {
-  padding: 0.5rem 1rem;
-  background-color: #ff9800;
-  color: #fff;
+/* Fee amount styles */
+.fee-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: 700;
+  color: #2d3d33;
+}
+
+.currency {
+  font-size: 20px;
+  margin-right: 5px;
+}
+
+/* Description styles */
+.membership-description {
+  display: flex;
+  flex-direction: column;
+}
+
+.description-content {
+  flex-grow: 1;
+  margin-bottom: 20px;
+  color: #666;
+  line-height: 1.6;
+  min-height: 100px;
+}
+
+/* Button styles */
+.register-btn, .edit-btn {
+  background-color: #2d3d33;
+  color: white;
   border: none;
-  border-radius: 4px;
+  padding: 12px 20px;
+  border-radius: 5px;
   cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  align-self: center;
+  transition: background-color 0.3s;
+  max-width: 200px;
 }
 
-.register-btn:hover {
-  background-color: #e68900;
+.register-btn:hover, .edit-btn:hover {
+  background-color: #1e2b24;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .membership-page {
+    padding: 10px;
+  }
+  
+  .membership-header h1 {
+    font-size: 24px;
+  }
+  
+  .fee-amount {
+    font-size: 36px;
+  }
+  
+  .currency {
+    font-size: 16px;
+  }
 }

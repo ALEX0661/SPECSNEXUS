@@ -15,9 +15,15 @@ const Chatbot = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Early return for non-allowed routes (after hooks to follow rules of hooks)
+  if (!allowedRoutes.includes(location.pathname)) {
+    return null;
+  }
 
   const toggleChat = () => {
     setIsOpen(prev => !prev);
@@ -27,20 +33,23 @@ const Chatbot = () => {
     setInput(e.target.value);
   };
 
-  const sendMessage = async () => {
+  const handleSendMessage = async () => {
     if (!input.trim() || loading) return;
     
+    // Add user message and clear input
     const userMessage = { sender: 'user', text: input.trim() };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:8000/chat/", { message: userMessage.text });
-      const botResponse = response.data.response;
-      setMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
+      // Get bot response
+      const response = await axios.post("http://localhost:8000/chat/", { 
+        message: userMessage.text 
+      });
+      setMessages(prev => [...prev, { sender: 'bot', text: response.data.response }]);
     } catch (error) {
-      console.error("Error from chat endpoint:", error);
+      console.error("Chat API error:", error);
       setMessages(prev => [
         ...prev,
         { sender: 'bot', text: "Sorry, I'm having trouble processing your request." }
@@ -50,44 +59,87 @@ const Chatbot = () => {
     }
   };
 
-  if (!allowedRoutes.includes(location.pathname)) {
-    return null;
-  }
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
 
   return (
-    <>
-      <div className="chatbot-button" onClick={toggleChat}>
-        <span>Chat</span>
-      </div>
+    <div className="chatbot-wrapper">
+      <button 
+        className={`chatbot-launcher ${isOpen ? 'active' : ''}`}
+        onClick={toggleChat}
+        aria-label={isOpen ? "Close chat" : "Open chat"}
+        aria-expanded={isOpen}
+      >
+        <span className="chat-icon">💬</span>
+      </button>
+
       {isOpen && (
-        <div className="chatbot-container">
+        <div className="chatbot-dialog" role="dialog" aria-label="Chat window">
           <div className="chatbot-header">
-            <h3>SPECS Assistance</h3>
-            <button className="close-button" onClick={toggleChat}>×</button>
+            <h2 className="chatbot-title">SPECS Assistance</h2>
+            <button 
+              className="chatbot-close"
+              onClick={toggleChat}
+              aria-label="Close chat"
+            >
+              &times;
+            </button>
           </div>
-          <div className="chatbot-messages">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`chat-message ${msg.sender}`}>
-                {msg.text}
-              </div>
-            ))}
-            {loading && <div className="chat-message bot">Typing...</div>}
-            <div ref={messagesEndRef} />
-          </div>
-          <div className="chatbot-input">
-            <input
-              type="text"
-              value={input}
-              onChange={handleInputChange}
-              placeholder="Type your message..."
-              onKeyDown={(e) => { if (e.key === 'Enter') sendMessage(); }}
-              disabled={loading}
-            />
-            <button onClick={sendMessage} disabled={loading}>Send</button>
+
+          <div className="chatbot-content">
+            <ul className="chatbot-messages">
+              {messages.map((msg, idx) => (
+                <li 
+                  key={idx}
+                  className={`chat-message chat-message--${msg.sender}`}
+                  role="listitem"
+                >
+                  <div className="message-bubble">
+                    {msg.text}
+                  </div>
+                </li>
+              ))}
+              {loading && (
+                <li className="chat-message chat-message--bot">
+                  <div className="message-bubble typing-indicator">
+                    <span>•</span>
+                    <span>•</span>
+                    <span>•</span>
+                  </div>
+                </li>
+              )}
+              <div ref={messagesEndRef} />
+            </ul>
+
+            <div className="chatbot-input-area">
+              <input
+                type="text"
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={loading}
+                aria-label="Type your message"
+                className="chatbot-input"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={loading}
+                className="chatbot-send-button"
+                aria-label="Send message"
+              >
+                <svg className="send-icon" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

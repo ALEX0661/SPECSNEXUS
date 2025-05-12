@@ -2,85 +2,116 @@ import React from 'react';
 import '../styles/EventCard.css';
 
 const EventCard = ({ event, onClick }) => {
-  // Function to determine registration status badge color
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case 'open':
-        return 'status-badge status-open';
-      case 'not_started':
-        return 'status-badge status-not-started';
-      case 'closed':
-        return 'status-badge status-closed';
-      default:
-        return 'status-badge';
-    }
-  };
-
-  // Function to format the registration status text
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'open':
-        return 'Registration Open';
-      case 'not_started':
-        return 'Not Started Yet';
-      case 'closed':
-        return 'Registration Closed';
-      default:
-        return 'Unknown Status';
-    }
-  };
-
-  // Function to format the date display
-  const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Function to determine registration status badge
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      open: { class: 'status-badge status-open', icon: 'fa-door-open', text: 'REGISTRATION OPEN' },
+      not_started: { class: 'status-badge status-not-started', icon: 'fa-clock', text: 'OPENS SOON' },
+      closed: { class: 'status-badge status-closed', icon: 'fa-lock', text: 'REGISTRATION CLOSED' }
     };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    
+    const config = statusConfig[status] || { class: 'status-badge', icon: 'fa-question-circle', text: 'UNKNOWN' };
+    
+    return (
+      <div className={config.class}>
+        <i className={`fas ${config.icon}`}></i> {config.text}
+      </div>
+    );
   };
 
-  // Check if user is registered for this event
+  // Format date for display in card
+  const formatEventDate = (dateString) => {
+    const date = new Date(dateString);
+    const options = { 
+      month: 'short', 
+      day: 'numeric'
+    };
+    
+    const timeOptions = {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    };
+    
+    return {
+      day: date.getDate(),
+      month: date.toLocaleDateString('en-US', { month: 'short' }),
+      date: date.toLocaleDateString('en-US', options),
+      time: date.toLocaleTimeString('en-US', timeOptions),
+      year: date.getFullYear()
+    };
+  };
+  
+  const eventDate = formatEventDate(event.date);
+  
+  // Check if the card should show the registered badge
   const isParticipating = event.is_participant === true;
+  
+  // Truncate description to keep cards consistent
+  const truncateText = (text, maxLength) => {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
 
   return (
     <div className="event-card" onClick={() => onClick(event)}>
-      <div className="event-image-container">
-        <img 
-          src={
-            event.image_url
-              ? (event.image_url.startsWith("http")
-                ? event.image_url
-                : `http://localhost:8000${event.image_url}`)
-              : "/default_event.png"
-          } 
-          alt={event.title} 
-          className="event-image"
-        />
-        <div className={getStatusBadgeClass(event.registration_status)}>
-          {getStatusText(event.registration_status)}
+      <div className="event-card-inner">
+        {/* Date display in top left corner */}
+        <div className="event-date-badge">
+          <div className="event-month">{eventDate.month}</div>
+          <div className="event-day">{eventDate.day}</div>
         </div>
         
-        {/* Add registered badge if user is participating */}
-        {isParticipating && (
-          <div className="registered-badge">
-            <i className="fas fa-check-circle"></i> Registered
+        {/* Event image with overlay */}
+        <div className="event-image-wrapper">
+          <img 
+            src={
+              event.image_url
+                ? (event.image_url.startsWith("http")
+                  ? event.image_url
+                  : `http://localhost:8000${event.image_url}`)
+                : "/default_event.png"
+            } 
+            alt={event.title} 
+            className="event-image"
+          />
+          <div className="image-overlay"></div>
+          
+          {/* Status badge */}
+          {getStatusBadge(event.registration_status)}
+          
+          {/* Registered indicator */}
+          {isParticipating && (
+            <div className="registered-badge">
+              <i className="fas fa-check-circle"></i> REGISTERED
+            </div>
+          )}
+        </div>
+        
+        {/* Event content */}
+        <div className="event-content">
+          <h3 className="event-title">{truncateText(event.title, 40)}</h3>
+          
+          <div className="event-info">
+            <div className="event-info-item">
+              <i className="fas fa-clock event-icon"></i>
+              <span>{eventDate.time}</span>
+            </div>
+            <div className="event-info-item">
+              <i className="fas fa-map-marker-alt event-icon"></i>
+              <span>{truncateText(event.location, 25)}</span>
+            </div>
+            <div className="event-info-item">
+              <i className="fas fa-users event-icon"></i>
+              <span>{event.participant_count} Attendees</span>
+            </div>
           </div>
-        )}
-      </div>
-      <div className="event-content">
-        <h3 className="event-title">{event.title}</h3>
-        <p className="event-date"><i className="fas fa-calendar-alt"></i> {formatDate(event.date)}</p>
-        <p className="event-location"><i className="fas fa-map-marker-alt"></i> {event.location}</p>
-        <p className="event-participants"><i className="fas fa-users"></i> {event.participant_count} Attendees</p>
-        {event.registration_start && (
-          <p className="event-registration"><i className="fas fa-clock"></i> Registration starts: {formatDate(event.registration_start)}</p>
-        )}
-        {event.registration_end && (
-          <p className="event-registration"><i className="fas fa-hourglass-end"></i> Registration ends: {formatDate(event.registration_end)}</p>
-        )}
+          
+          <button className="view-details-btn">
+            <span>VIEW DETAILS</span>
+            <i className="fas fa-arrow-right"></i>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -9,10 +9,12 @@ const MembershipPage = () => {
   const [user, setUser] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [selectedMembership, setSelectedMembership] = useState(null);
+  const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('accessToken');
 
   useEffect(() => {
     async function fetchProfile() {
+      setLoading(true);
       try {
         const userData = await getProfile(token);
         setUser(userData);
@@ -31,6 +33,8 @@ const MembershipPage = () => {
           setMemberships(membershipsData);
         } catch (error) {
           console.error("Failed to fetch membership info:", error);
+        } finally {
+          setLoading(false);
         }
       }
       fetchMemberships();
@@ -47,81 +51,93 @@ const MembershipPage = () => {
     }
   };
 
-  const getProgressData = (status) => {
-    const lower = status ? status.trim().toLowerCase() : "";
-    let progressPercentage = 0;
-    let progressColor = "#ccc";
-    if (lower === "not paid") {
-      progressPercentage = 0;
-      progressColor = "#ccc";
-    } else if (lower === "verifying") {
-      progressPercentage = 50;
-      progressColor = "#28a745";
-    } else if (lower === "paid") {
-      progressPercentage = 100;
-      progressColor = "#28a745";
-    }
-    return { progressPercentage, progressColor, displayStatus: status };
-  };
-
-  if (!user) {
-    return <div>Loading...</div>;
-  }
-
   return (
     <Layout user={user}>
       <div className="membership-page">
-        <h1>My Membership Requirements</h1>
-        <div className="memberships-grid">
-          {memberships.length > 0 ? (
-            memberships.map((membership) => {
-              const status = membership.payment_status || "";
-              const { progressPercentage, progressColor, displayStatus } = getProgressData(status);
-              return (
+
+        {loading ? (
+          <div className="membership-loading">
+            {/* You can replace this with any spinner component you have */}
+            <p>Loading memberships…</p>
+          </div>
+        ) : (
+          <>
+            <div className="membership-list">
+              {memberships.map(membership => (
                 <div key={membership.id} className="membership-card">
-                  <div className="progress-bar-container">
-                    <div
-                      className="progress-bar"
-                      style={{ width: `${progressPercentage}%`, backgroundColor: progressColor }}
-                    >
-                      {displayStatus}
+                  <div className="membership-status">
+                    <h3>Membership Status</h3>
+                    <div className="status-progress">
+                      <div className="progress-steps">
+                        <div className={`progress-step ${membership.payment_status?.toLowerCase() === 'not paid' ? 'active' : ''}`}>
+                          <div className="step-dot"></div>
+                          <div className="step-label">Not Paid</div>
+                        </div>
+                        <div className={`progress-step ${['verifying','processing'].includes(membership.payment_status?.toLowerCase()) ? 'active' : ''}`}>
+                          <div className="step-dot"></div>
+                          <div className="step-label">Processing</div>
+                        </div>
+                        <div className={`progress-step ${membership.payment_status?.toLowerCase() === 'paid' ? 'active' : ''}`}>
+                          <div className="step-dot"></div>
+                          <div className="step-label">Paid</div>
+                        </div>
+                      </div>
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill" 
+                          style={{ 
+                            width: membership.payment_status?.toLowerCase() === 'not paid' ? '0%' : 
+                                  ['verifying','processing'].includes(membership.payment_status?.toLowerCase()) ? '50%' : '100%' 
+                          }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
-                  <div className="membership-details">
-                    <p><strong>Requirement:</strong> {membership.requirement || "N/A"}</p>
-                    <p><strong>Amount:</strong> ₱{membership.amount || "0"}</p>
-                    <p><strong>Membership ID:</strong> {membership.id}</p>
+
+                  <div className="membership-fee">
+                    <h3>Membership Fee Amount</h3>
+                    <div className="fee-amount">
+                      <span className="currency">₱</span>
+                      <span className="amount">{membership.amount || "50"}</span>
+                    </div>
                   </div>
-                  {status.trim().toLowerCase() === "not paid" && (
-                    <button
-                      className="register-btn"
-                      onClick={() => setSelectedMembership(membership)}
-                    >
-                      Register Membership
-                    </button>
-                  )}
-                  {status.trim().toLowerCase() === "verifying" && (
-                    <button
-                      className="edit-btn"
-                      onClick={() => setSelectedMembership(membership)}
-                    >
-                      Edit Uploaded Files
-                    </button>
-                  )}
+
+                  <div className="membership-description">
+                    <h3>Description</h3>
+                    <div className="description-content">
+                      {membership.requirement || "Membership fee payment is required for active status."}
+                    </div>
+                    {membership.payment_status?.toLowerCase() === 'not paid' && (
+                      <button 
+                        className="register-btn"
+                        onClick={() => setSelectedMembership(membership)}
+                      >
+                        Register Membership
+                      </button>
+                    )}
+                    {membership.payment_status?.toLowerCase() === 'verifying' && (
+                      <button 
+                        className="edit-btn"
+                        onClick={() => setSelectedMembership(membership)}
+                      >
+                        Edit Uploaded Files
+                      </button>
+                    )}
+                  </div>
                 </div>
-              );
-            })
-          ) : (
-            <p>No membership records found.</p>
-          )}
-        </div>
-        {selectedMembership && (
-          <MembershipModal
-            membership={selectedMembership}
-            onClose={() => setSelectedMembership(null)}
-            onReceiptUploaded={handleReceiptUploaded}
-          />
+              ))}
+            </div>
+
+            {selectedMembership && (
+              <MembershipModal
+                membership={selectedMembership}
+                onClose={() => setSelectedMembership(null)}
+                onReceiptUploaded={handleReceiptUploaded}
+              />
+            )}
+          </>
         )}
+
       </div>
     </Layout>
   );

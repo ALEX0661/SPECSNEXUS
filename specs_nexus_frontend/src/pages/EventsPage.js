@@ -11,6 +11,7 @@ const EventsPage = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // all, upcoming, registered
   const token = localStorage.getItem('accessToken');
 
   // Store user ID in localStorage for use in other components
@@ -37,7 +38,6 @@ const EventsPage = () => {
     try {
       setLoading(true);
       const eventsData = await getEvents(token);
-      console.log('Fetched events:', eventsData);
       setEvents(eventsData);
       
       // If we have a selected event, update it with the latest data
@@ -86,25 +86,71 @@ const EventsPage = () => {
     }
   };
 
-  if (loading && !user) {
-    return <div className="events-page"><p>Loading events...</p></div>;
+  const filterEvents = () => {
+    if (filter === 'all') {
+      return events;
+    } else if (filter === 'upcoming') {
+      const now = new Date();
+      return events.filter(event => new Date(event.date) > now);
+    } else if (filter === 'registered') {
+      return events.filter(event => event.is_participant === true);
+    }
+    return events;
+  };
+
+  const filteredEvents = filterEvents();
+
+  if (loading && !events.length) {
+    return (
+      <Layout user={user}>
+        <div className="events-page loading">
+          <div className="loader"></div>
+          <p>Loading events...</p>
+        </div>
+      </Layout>
+    );
   }
 
   return (
     <Layout user={user}>
       <div className="events-page">
-        <h1>Events</h1>
+        <div className="events-header">
+          <h1>Community Events</h1>
+          <div className="events-filters">
+            <button 
+              className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              All Events
+            </button>
+            <button 
+              className={`filter-btn ${filter === 'upcoming' ? 'active' : ''}`}
+              onClick={() => setFilter('upcoming')}
+            >
+              Upcoming
+            </button>
+            <button 
+              className={`filter-btn ${filter === 'registered' ? 'active' : ''}`}
+              onClick={() => setFilter('registered')}
+            >
+              My Events
+            </button>
+          </div>
+        </div>
+
         <div className="events-grid">
-          {events.length > 0 ? (
-            events.map((event) => (
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event) => (
               <EventCard key={event.id} event={event} onClick={handleCardClick} />
             ))
           ) : (
-            <p>No events available at this time.</p>
+            <div className="no-events-message">
+              <i className="fas fa-calendar-times"></i>
+              <p>No events found for the selected filter.</p>
+            </div>
           )}
         </div>
         
-        {/* Modal is now rendered outside of the normal document flow */}
         {selectedEvent && (
           <EventModal
             event={selectedEvent}

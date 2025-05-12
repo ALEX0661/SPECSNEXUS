@@ -1,11 +1,28 @@
 .layout-container {
-    display: flex;
-    min-height: 100vh;
-    background-color: #f9f9f9;
-  }
-  
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9f9f9;
+  overflow-x: hidden;
+  margin-left: 240px; /* Add sidebar width as margin to prevent overlap */
+}
+
+.page-content {
+  padding: 20px;
+  flex: 1;
+  max-width: 100%;
+}
+
+/* Media query for responsive design */
+@media (max-width: 768px) {
   .main-content {
-    flex: 1;
-    padding: 2rem;
+    margin-left: 0;
+    padding-top: 60px; /* Add space for mobile sidebar/header */
   }
-  
+}
