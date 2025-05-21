@@ -34,11 +34,15 @@ class Clearance(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     requirement = Column(Enum("1st Semester Membership", "2nd Semester Membership", name="requirement_type"), nullable=False)
     status = Column(Enum("Clear", "Processing", "Not Yet Cleared", name="clearance_status"), default="Not Yet Cleared", nullable=False)
-    payment_status = Column(Enum("Not Paid", "Verifying", "Paid", name="payment_status"), default="Not Paid", nullable=False)
+    payment_status = Column(Enum("Not Paid", "Verifying", "Paid", name="payment_status"), default="Not Paid", nullable=False)  
     receipt_path = Column(String(255), nullable=True)
     amount = Column(Float)
     archived = Column(Boolean, default=False)
     payment_method = Column(String(50), nullable=True)
+    denial_reason = Column(String(500), nullable=True)  # New field for denial reason
+    payment_date = Column(DateTime, nullable=True)  # New field for payment date
+    approval_date = Column(DateTime, nullable=True)  # New field for approval date
+    last_updated = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     user = relationship("User", back_populates="clearance")
 
 class QRCode(Base):

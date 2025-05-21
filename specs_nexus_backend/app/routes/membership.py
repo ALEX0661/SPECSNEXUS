@@ -3,8 +3,12 @@ import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
+import datetime
+import pytz
+import boto3
+from botocore.client import Config
 
 from app.database import SessionLocal
 from app import models, schemas
@@ -21,82 +25,148 @@ def get_db():
     finally:
         db.close()
 
+# Configure boto3 client for Cloudflare R2
+access_key_id = os.getenv('CF_ACCESS_KEY_ID')
+secret_access_key = os.getenv('CF_SECRET_ACCESS_KEY')
+bucket_name = os.getenv('CLOUDFLARE_R2_BUCKET')
+endpoint_url = os.getenv('CLOUDFLARE_R2_ENDPOINT')
+
+# Log environment variables for debugging (without showing secret values)
+logger.debug(f"CF_ACCESS_KEY_ID set: {bool(access_key_id)}")
+logger.debug(f"CF_SECRET_ACCESS_KEY set: {bool(secret_access_key)}")
+logger.debug(f"CLOUDFLARE_R2_BUCKET: {bucket_name}")
+logger.debug(f"CLOUDFLARE_R2_ENDPOINT: {endpoint_url}")
+
+# Verify that bucket_name is not None before proceeding
+if not bucket_name:
+    logger.error("CLOUDFLARE_R2_BUCKET environment variable is not set")
+    bucket_name = "specs-nexus-files"  # Fallback to hardcoded value
+
+s3 = boto3.client(
+    's3',
+    endpoint_url=endpoint_url,
+    aws_access_key_id=access_key_id,
+    aws_secret_access_key=secret_access_key,
+    config=Config(signature_version='s3v4'),
+    region_name='auto'
+)
+
+# Make the upload_to_r2 function async
+async def upload_to_r2(file: UploadFile, object_key: str):
+    try:
+        # Get credentials from environment variables
+        access_key = os.getenv("CF_ACCESS_KEY_ID")
+        secret_key = os.getenv("CF_SECRET_ACCESS_KEY")
+        bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET")
+        endpoint_url = os.getenv("CLOUDFLARE_R2_ENDPOINT")
+        
+        # Use worker URL instead of direct R2 public URL
+        worker_url = os.getenv("CLOUDFLARE_WORKER_URL", "https://specsnexus-images.senya-videos.workers.dev")
+        
+        # Log credential availability for debugging
+        logger.info(f"R2 Credentials - Access Key: {'Available' if access_key else 'Missing'}")
+        logger.info(f"R2 Credentials - Secret Key: {'Available' if secret_key else 'Missing'}")
+        logger.info(f"R2 Credentials - Bucket: {bucket_name or 'Missing'}")
+        logger.info(f"R2 Credentials - Endpoint: {endpoint_url or 'Missing'}")
+        logger.info(f"R2 Credentials - Worker URL: {worker_url or 'Missing'}")
+        
+        if not all([access_key, secret_key, bucket_name, endpoint_url, worker_url]):
+            raise ValueError("Missing R2 credentials or configuration")
+        
+        # Create S3 client with explicit credentials
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            endpoint_url=endpoint_url
+        )
+        
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            logger.error(f"Invalid file type uploaded: {file.content_type}")
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Upload the file
+        logger.info(f"Uploading file to R2: {object_key}")
+        s3.upload_fileobj(file.file, bucket_name, object_key)
+        
+        # Use the worker URL for the uploaded file
+        if worker_url.endswith('/'):
+            file_url = f"{worker_url}{object_key}"
+        else:
+            file_url = f"{worker_url}/{object_key}"
+            
+        logger.info(f"File uploaded successfully: {file_url}")
+        return file_url
+        
+    except Exception as e:
+        logger.error(f"Error uploading file to R2: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 # QR Code Endpoints
 
-
-# Endpoint: GET /membership/qrcode
-# Description: Returns the QR code URL for the specified payment type ("gcash" or "paymaya")
 @router.get("/qrcode", response_model=dict)
 def get_qrcode(payment_type: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     logger.debug(f"User {current_user.id} ({current_user.full_name}) fetching QR code for payment type: {payment_type}")
     if payment_type not in ["gcash", "paymaya"]:
         logger.error(f"User {current_user.id} provided invalid payment type: {payment_type}")
         raise HTTPException(status_code=400, detail="Payment type must be 'gcash' or 'paymaya'")
+    
     qr_record = db.query(models.QRCode).first()
     if not qr_record:
-        logger.error("QR code record not found")
-        raise HTTPException(status_code=404, detail="QR code not found")
+        logger.error("No QR code record found")
+        raise HTTPException(status_code=404, detail="No QR code record found")
+    
     url = qr_record.gcash if payment_type == "gcash" else qr_record.paymaya
-    if url and not url.startswith("http"):
-        url = f"http://localhost:8000{url if url.startswith('/') else '/' + url}"
+    if not url:
+        logger.error(f"No QR code uploaded for payment type: {payment_type}")
+        raise HTTPException(status_code=404, detail=f"No QR code uploaded for {payment_type}")
+    
     logger.info(f"User {current_user.id} fetched QR code URL: {url}")
     return {"qr_code_url": url}
 
-# Endpoint: POST /membership/officer/requirement/upload_qrcode
-# Description: Allows an officer to upload a QR code image for a specific membership requirement and payment type.
-@router.post("/officer/requirement/upload_qrcode", response_model=schemas.MembershipSchema)
-async def upload_officer_requirement_qrcode(
-    requirement: str,
-    payment_type: str,
+@router.post("/officer/upload_qrcode", response_model=dict)
+async def upload_officer_qrcode(
+    payment_type: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_officer: models.Officer = Depends(get_current_officer)
 ):
-    logger.debug(f"Officer {current_officer.id} ({current_officer.full_name}) uploading QR code for requirement: {requirement} and payment type: {payment_type}")
+    logger.debug(f"Officer {current_officer.id} ({current_officer.full_name}) uploading QR code for payment_type: {payment_type}")
     if payment_type not in ["gcash", "paymaya"]:
         logger.error(f"Officer {current_officer.id} provided invalid payment type: {payment_type}")
         raise HTTPException(status_code=400, detail="Payment type must be 'gcash' or 'paymaya'")
     
-    qrcode_dir = "static/qrcodes"
-    os.makedirs(qrcode_dir, exist_ok=True)
+    # Generate a unique filename to prevent collisions
+    original_filename = file.filename.replace("\\", "/").split("/")[-1]
+    safe_filename = f"{uuid.uuid4().hex}_{original_filename}"
+    object_key = f"qrcodes/{safe_filename}"
     
-    file_path = os.path.join(qrcode_dir, file.filename)
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+    try:
+        file_url = await upload_to_r2(file, object_key)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error uploading QR code to R2: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error uploading QR code file")
     
     qr_record = db.query(models.QRCode).first()
     if not qr_record:
         qr_record = models.QRCode()
         db.add(qr_record)
-        db.commit()
-        db.refresh(qr_record)
     
     if payment_type == "gcash":
-        qr_record.gcash = file_path
+        qr_record.gcash = file_url
     else:
-        qr_record.paymaya = file_path
+        qr_record.paymaya = file_url
     
     db.commit()
     db.refresh(qr_record)
-    logger.info(f"Officer {current_officer.id} uploaded QR code successfully for {payment_type}")
-    # Return a dummy membership schema for display purposes.
-    return {
-        "id": 0,
-        "receipt_path": None,
-        "status": "N/A",
-        "payment_status": "N/A",
-        "requirement": requirement,
-        "amount": None,
-        "qr_code_url": qr_record.gcash if payment_type == "gcash" else qr_record.paymaya,
-        "archived": False,
-        "user": None
-    }
+    logger.info(f"Officer {current_officer.id} uploaded QR code successfully for {payment_type} at {file_url}")
+    return {"qr_code_url": file_url}
 
 # User Endpoints
 
-# Endpoint: GET /membership/memberships/{user_id}
-# Description: Returns a list of membership records (clearances) for the specified user.
 @router.get("/memberships/{user_id}", response_model=List[schemas.MembershipSchema])
 def get_memberships(
     user_id: int, 
@@ -111,36 +181,32 @@ def get_memberships(
     logger.info(f"User {current_user.id} fetched {len(memberships)} membership records for user_id: {user_id}")
     return memberships
 
-# Endpoint: POST /membership/upload_receipt_file
-# Description: Allows a user to upload a receipt file. Returns the file path after saving.
 @router.post("/upload_receipt_file", response_model=dict)
 async def upload_receipt_file(
     file: UploadFile = File(...),
     current_user: models.User = Depends(get_current_user)
 ):
     logger.debug(f"User {current_user.id} ({current_user.full_name}) uploading a receipt file")
-    receipt_dir = "app/static/receipts"
-    os.makedirs(receipt_dir, exist_ok=True)
+    # Generate a unique filename to prevent collisions
     unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
-    file_path = os.path.join(receipt_dir, unique_filename)
-    try:
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-    except Exception as e:
-        logger.error(f"Error saving receipt file for user {current_user.id}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error saving receipt file")
+    object_key = f"receipts/{unique_filename}"
     
-    logger.info(f"User {current_user.id} saved receipt file: {file_path}")
-    return {"file_path": file_path}
+    try:
+        file_url = await upload_to_r2(file, object_key)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error uploading receipt file to R2 for user {current_user.id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error uploading receipt file")
+    
+    logger.info(f"User {current_user.id} uploaded receipt file to R2: {file_url}")
+    return {"file_path": file_url}
 
 class UpdateReceiptPayload(BaseModel):
     membership_id: int
     payment_type: str
     receipt_path: str
 
-# Endpoint: PUT /membership/update_receipt
-# Description: Updates the receipt information for a membership record.
 @router.put("/update_receipt", response_model=schemas.MembershipSchema)
 def update_receipt(
     payload: UpdateReceiptPayload, 
@@ -165,6 +231,7 @@ def update_receipt(
     membership.payment_status = "Verifying"
     membership.status = "Processing"
     membership.payment_method = payment_type
+    membership.payment_date = datetime.datetime.now(pytz.timezone('Asia/Manila'))
 
     db.commit()
     db.refresh(membership)
@@ -173,8 +240,6 @@ def update_receipt(
 
 # Officer Endpoints (Membership Management)
 
-# Endpoint: GET /membership/officer/list
-# Description: Allows an officer to fetch all active membership records.
 @router.get("/officer/list", response_model=List[schemas.MembershipSchema])
 def officer_list_membership(
     db: Session = Depends(get_db), 
@@ -188,8 +253,6 @@ def officer_list_membership(
     logger.info(f"Officer {current_officer.id} fetched {len(memberships)} membership records")
     return memberships
 
-# Endpoint: POST /membership/officer/create
-# Description: Allows an officer to create a new membership record.
 @router.post("/officer/create", response_model=schemas.MembershipSchema)
 def officer_create_membership(
     user_id: int = Form(...),
@@ -215,17 +278,19 @@ def officer_create_membership(
     logger.info(f"Membership record {new_record.id} created for user_id: {user_id} by officer {current_officer.id}")
     return new_record
 
-# Endpoint: PUT /membership/officer/verify/{membership_id}
-# Description: Allows an officer to verify (approve or deny) a membership record.
+class VerifyMembershipPayload(BaseModel):
+    action: str
+    denial_reason: Optional[str] = None
+
 @router.put("/officer/verify/{membership_id}", response_model=schemas.MembershipSchema)
 def officer_verify_membership(
     membership_id: int,
-    payload: dict = Body(...),
+    payload: VerifyMembershipPayload = Body(...),
     db: Session = Depends(get_db),
     current_officer: models.Officer = Depends(get_current_officer)
 ):
     logger.debug(f"Officer {current_officer.id} verifying membership record id: {membership_id}")
-    action = payload.get("action")
+    action = payload.action
     if action not in ["approve", "deny"]:
         logger.error(f"Officer {current_officer.id} provided invalid action: {action} for membership_id: {membership_id}")
         raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'deny'.")
@@ -240,19 +305,21 @@ def officer_verify_membership(
     if action == "approve":
         membership.payment_status = "Paid"
         membership.status = "Clear"
+        membership.approval_date = datetime.datetime.now(pytz.timezone('Asia/Manila'))
+        membership.denial_reason = None
     elif action == "deny":
         membership.payment_status = "Not Paid"
         membership.status = "Not Yet Cleared"
         membership.receipt_path = None
-        membership.payment_method = None  # Reset payment_method when denied.
+        membership.payment_method = None
+        membership.denial_reason = payload.denial_reason
+        membership.payment_date = None
     
     db.commit()
     db.refresh(membership)
     logger.info(f"Officer {current_officer.id} updated membership record {membership_id} with action {action}")
     return membership
 
-# Endpoint: GET /membership/officer/requirements
-# Description: Returns a list of distinct membership requirements from active records.
 @router.get("/officer/requirements", response_model=List[schemas.MembershipSchema])
 def get_officer_requirements(
     db: Session = Depends(get_db), 
@@ -268,8 +335,6 @@ def get_officer_requirements(
     logger.info(f"Officer {current_officer.id} fetched {len(result)} distinct membership requirements")
     return result
 
-# Endpoint: PUT /membership/officer/requirements/{requirement}
-# Description: Allows an officer to update membership requirement details (like amount) for all records with that requirement.
 @router.put("/officer/requirements/{requirement}", response_model=schemas.MembershipSchema)
 def update_officer_requirement(
     requirement: str, 
@@ -289,8 +354,6 @@ def update_officer_requirement(
     logger.info(f"Officer {current_officer.id} updated requirement {requirement} successfully")
     return records[0]
 
-# Endpoint: DELETE /membership/officer/requirements/{requirement}
-# Description: Allows an officer to archive all membership records for a given requirement.
 @router.delete("/officer/requirements/{requirement}", response_model=schemas.MessageResponse)
 def delete_officer_requirement(
     requirement: str, 
@@ -308,8 +371,6 @@ def delete_officer_requirement(
     logger.info(f"Officer {current_officer.id} archived requirement {requirement} successfully")
     return {"message": "Requirement archived successfully"}
 
-# Endpoint: POST /membership/officer/requirement/create
-# Description: Allows an officer to create a new membership requirement for all users that don't already have it.
 @router.post("/officer/requirement/create", response_model=schemas.MembershipSchema)
 def create_officer_requirement(
     requirement: str = Form(...),

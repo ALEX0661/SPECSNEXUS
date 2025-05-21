@@ -10,7 +10,7 @@ class UserBase(BaseModel):
     block: Optional[str] = None
 
 class UserLogin(BaseModel):
-    email_or_student_number: str  # Changed from email: EmailStr
+    email_or_student_number: str
     password: str
 
 class UserInfo(BaseModel):
@@ -51,6 +51,9 @@ class MembershipSchema(BaseModel):
     archived: bool
     user: Optional[UserInfo] = None
     payment_method: Optional[str] = None
+    denial_reason: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    approval_date: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -68,7 +71,7 @@ class EventSchema(BaseModel):
     registration_end: Optional[datetime] = None
     registration_open: bool
     registration_status: str
-    is_participant: Optional[bool] = False  # New field to track if current user is participating
+    is_participant: Optional[bool] = False
 
     class Config:
         orm_mode = True

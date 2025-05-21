@@ -2,13 +2,16 @@ import logging
 from datetime import datetime
 import os
 from typing import List, Optional
+import boto3
+from botocore.client import Config
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app import models, schemas
-from app.auth_utils import get_current_user, get_current_officer  # Import both user and officer dependencies
+from app.auth_utils import get_current_user, get_current_officer
 
 logger = logging.getLogger("app.events")
 
@@ -21,9 +24,81 @@ def get_db():
     finally:
         db.close()
 
+# Configure boto3 client for Cloudflare R2
+access_key_id = os.getenv('CF_ACCESS_KEY_ID')
+secret_access_key = os.getenv('CF_SECRET_ACCESS_KEY')
+bucket_name = os.getenv('CLOUDFLARE_R2_BUCKET')
+endpoint_url = os.getenv('CLOUDFLARE_R2_ENDPOINT')
+
+# Log environment variables for debugging (without showing secret values)
+logger.debug(f"CF_ACCESS_KEY_ID set: {bool(access_key_id)}")
+logger.debug(f"CF_SECRET_ACCESS_KEY set: {bool(secret_access_key)}")
+logger.debug(f"CLOUDFLARE_R2_BUCKET: {bucket_name}")
+logger.debug(f"CLOUDFLARE_R2_ENDPOINT: {endpoint_url}")
+
+# Verify that bucket_name is not None before proceeding
+if not bucket_name:
+    logger.error("CLOUDFLARE_R2_BUCKET environment variable is not set")
+    bucket_name = "specs-nexus-files"  # Fallback to hardcoded value
+
+s3 = boto3.client(
+    's3',
+    endpoint_url=endpoint_url,
+    aws_access_key_id=access_key_id,
+    aws_secret_access_key=secret_access_key,
+    config=Config(signature_version='s3v4'),
+    region_name='auto'
+)
+
+# Make the upload_to_r2 function async
+async def upload_to_r2(file: UploadFile, object_key: str):
+    try:
+        # Get credentials from environment variables
+        access_key = os.getenv("CF_ACCESS_KEY_ID")
+        secret_key = os.getenv("CF_SECRET_ACCESS_KEY")
+        bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET")
+        endpoint_url = os.getenv("CLOUDFLARE_R2_ENDPOINT")
+        
+        # Use worker URL instead of direct R2 public URL
+        worker_url = os.getenv("CLOUDFLARE_WORKER_URL", "https://specsnexus-images.senya-videos.workers.dev")
+        
+        # Log credential availability for debugging
+        logger.info(f"R2 Credentials - Access Key: {'Available' if access_key else 'Missing'}")
+        logger.info(f"R2 Credentials - Secret Key: {'Available' if secret_key else 'Missing'}")
+        logger.info(f"R2 Credentials - Bucket: {bucket_name or 'Missing'}")
+        logger.info(f"R2 Credentials - Endpoint: {endpoint_url or 'Missing'}")
+        logger.info(f"R2 Credentials - Worker URL: {worker_url or 'Missing'}")
+        
+        if not all([access_key, secret_key, bucket_name, endpoint_url, worker_url]):
+            raise ValueError("Missing R2 credentials or configuration")
+        
+        # Create S3 client with explicit credentials
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            endpoint_url=endpoint_url
+        )
+        
+        # Upload the file
+        logger.info(f"Uploading file to R2: {object_key}")
+        s3.upload_fileobj(file.file, bucket_name, object_key)
+        
+        # Use the worker URL for the uploaded file
+        if worker_url.endswith('/'):
+            file_url = f"{worker_url}{object_key}"
+        else:
+            file_url = f"{worker_url}/{object_key}"
+            
+        logger.info(f"File uploaded successfully: {file_url}")
+        return file_url
+        
+    except Exception as e:
+        logger.error(f"Error uploading file to R2: {str(e)}")
+        raise
+
 # Endpoint: GET /events/
 # Description: Returns a list of all active (non-archived) events.
-# Update the get_events function to include is_participant flag
 @router.get("/", response_model=List[schemas.EventSchema])
 def get_events(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     logger.debug("Fetching all active events")
@@ -112,7 +187,7 @@ def admin_list_events(
     return events
 
 # Endpoint: POST /events/officer/create
-# Description: Allows an officer to create a new event. An image can be optionally uploaded.
+# Description: Allows an officer to create a new event. An image can be optionally uploaded to R2.
 @router.post("/officer/create", response_model=schemas.EventSchema)
 async def admin_create_event(
     title: str = Form(...),
@@ -126,17 +201,15 @@ async def admin_create_event(
     current_officer: models.Officer = Depends(get_current_officer)
 ):
     logger.debug(f"Officer {current_officer.id} ({current_officer.full_name}) creating event with title: {title}")
+    
     image_url = None
-    if image:
-        os.makedirs("app/static/event_images", exist_ok=True)
-        file_ext = os.path.splitext(image.filename)[1]
-        unique_name = f"{datetime.now().timestamp()}{file_ext}"
-        file_path = f"app/static/event_images/{unique_name}"
-        with open(file_path, "wb") as f:
-            content = await image.read()
-            f.write(content)
-        image_url = f"/static/event_images/{unique_name}"
-        logger.debug(f"Uploaded event image: {image_url}")
+    if image and image.filename:
+        # Only attempt upload if there's actually a file
+        # Generate a unique filename to prevent collisions
+        filename = f"{uuid.uuid4()}-{image.filename}"
+        object_key = f"event_images/{filename}"
+        image_url = await upload_to_r2(image, object_key)
+        logger.debug(f"Uploaded event image to R2: {image_url}")
     
     # Set default registration_start if not provided
     if not registration_start:
@@ -158,7 +231,7 @@ async def admin_create_event(
     return new_event
 
 # Endpoint: PUT /events/officer/update/{event_id}
-# Description: Allows an officer to update an existing event, including its image.
+# Description: Allows an officer to update an existing event, including its image in R2.
 @router.put("/officer/update/{event_id}", response_model=schemas.EventSchema)
 async def admin_update_event(
     event_id: int,
@@ -177,16 +250,15 @@ async def admin_update_event(
     if not event:
         logger.error(f"Event {event_id} not found for update")
         raise HTTPException(status_code=404, detail="Event not found")
-    if image:
-        os.makedirs("app/static/event_images", exist_ok=True)
-        file_ext = os.path.splitext(image.filename)[1]
-        unique_name = f"{datetime.now().timestamp()}{file_ext}"
-        file_path = f"app/static/event_images/{unique_name}"
-        with open(file_path, "wb") as f:
-            content = await image.read()
-            f.write(content)
-        event.image_url = f"/static/event_images/{unique_name}"
-        logger.debug(f"Updated event image: {event.image_url}")
+    
+    if image and image.filename:
+        # Only attempt upload if there's actually a file
+        # Generate a unique filename to prevent collisions
+        filename = f"{uuid.uuid4()}-{image.filename}"
+        object_key = f"event_images/{filename}"
+        event.image_url = await upload_to_r2(image, object_key)
+        logger.debug(f"Updated event image in R2: {event.image_url}")
+    
     event.title = title
     event.description = description
     event.date = date

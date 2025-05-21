@@ -20,7 +20,6 @@ def get_db():
     finally:
         db.close()
 
-
 # Officer Authentication Endpoints
 
 # Endpoint: POST /officers/login
@@ -37,10 +36,6 @@ def officer_login(officer: schemas.OfficerLoginSchema, db: Session = Depends(get
         logger.error("Incorrect password for officer login")
         raise HTTPException(status_code=400, detail="Incorrect password")
     
-    if db_officer.archived:
-        logger.error(f"Archived officer {db_officer.id} attempted to log in")
-        raise HTTPException(status_code=403, detail="Officer account is archived and cannot log in.")
-    
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(data={"sub": str(db_officer.id)}, expires_delta=access_token_expires)
     logger.info(f"Officer {db_officer.id} ({db_officer.full_name}) logged in successfully")
@@ -51,23 +46,70 @@ def officer_login(officer: schemas.OfficerLoginSchema, db: Session = Depends(get
     }
 
 # Endpoint: GET /officers/
-# Description: Returns a list of all active officers for a logged-in officer.
+# Description: Returns a list of all officers for a logged-in officer.
 @router.get("/", response_model=List[schemas.OfficerSchema])
 def get_officers(db: Session = Depends(get_db), current_officer: models.Officer = Depends(admin_required)):
-
     logger.debug(f"get_officers called by Officer {current_officer.id} ({current_officer.full_name})")
-    officers = db.query(models.Officer).filter(models.Officer.archived == False).all()
+    officers = db.query(models.Officer).all()
     logger.info(f"Officer {current_officer.id} fetched {len(officers)} officers")
     return officers
 
 # Endpoint: GET /officers/ (Admin)
-# Description: Allows an admin to fetch all active officers.
+# Description: Allows an admin to fetch all officers.
 @router.get("/", response_model=List[schemas.OfficerSchema], dependencies=[Depends(admin_required)])
 def get_officers_admin(db: Session = Depends(get_db)):
-    logger.debug("Admin fetching all active officers")
-    officers = db.query(models.Officer).filter(models.Officer.archived == False).all()
+    logger.debug("Admin fetching all officers")
+    officers = db.query(models.Officer).all()
     logger.info(f"Admin fetched {len(officers)} officers")
     return officers
+
+# Endpoint: GET /officers/users
+# Description: Allows an admin to fetch all users for adding as officers.
+@router.get("/users", response_model=List[schemas.User], dependencies=[Depends(admin_required)])
+def get_users_for_officers(db: Session = Depends(get_db)):
+    logger.debug("Admin fetching all users for officer creation")
+    users = db.query(models.User).all()
+    logger.info(f"Admin fetched {len(users)} users")
+    return users
+
+# Endpoint: POST /officers/bulk
+# Description: Allows an admin to create multiple officer accounts from selected user IDs.
+@router.post("/bulk", response_model=List[schemas.OfficerSchema], dependencies=[Depends(admin_required)])
+def create_officers_bulk(
+    user_ids: List[int] = Form(...),
+    position: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    logger.debug(f"Admin creating officers from user IDs: {user_ids}")
+    created_officers = []
+    for user_id in user_ids:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            logger.warning(f"User with ID {user_id} not found, skipping")
+            continue
+        existing_officer = db.query(models.Officer).filter(
+            (models.Officer.email == user.email) | (models.Officer.student_number == user.student_number)
+        ).first()
+        if existing_officer:
+            logger.warning(f"Officer with email {user.email} or student number {user.student_number} already exists, skipping")
+            continue
+        officer = models.Officer(
+            full_name=user.full_name,
+            email=user.email,
+            password=user.password,
+            student_number=user.student_number,
+            year=user.year,
+            block=user.block,
+            position=position,
+            archived=False
+        )
+        db.add(officer)
+        created_officers.append(officer)
+    db.commit()
+    for officer in created_officers:
+        db.refresh(officer)
+    logger.info(f"Created {len(created_officers)} officers successfully")
+    return created_officers
 
 # Endpoint: POST /officers/
 # Description: Allows an admin to create a new officer account.
@@ -122,7 +164,7 @@ def update_officer(
     current_officer: models.Officer = Depends(admin_required)
 ):
     logger.debug(f"Officer {current_officer.id} ({current_officer.full_name}) updating officer id: {officer_id}")
-    officer = db.query(models.Officer).filter(models.Officer.id == officer_id, models.Officer.archived == False).first()
+    officer = db.query(models.Officer).filter(models.Officer.id == officer_id).first()
     if not officer:
         logger.error("Officer not found for update")
         raise HTTPException(status_code=404, detail="Officer not found")
@@ -139,60 +181,16 @@ def update_officer(
     return officer
 
 # Endpoint: DELETE /officers/{officer_id}
-# Description: Archives an officer account.
+# Description: Permanently deletes an officer account.
 @router.delete("/{officer_id}", response_model=dict, dependencies=[Depends(admin_required)])
 def delete_officer(officer_id: int, db: Session = Depends(get_db), current_officer: models.Officer = Depends(admin_required)):
     logger.debug(f"Officer {current_officer.id} ({current_officer.full_name}) deleting officer id: {officer_id}")
-    officer = db.query(models.Officer).filter(models.Officer.id == officer_id, models.Officer.archived == False).first()
+    officer = db.query(models.Officer).filter(models.Officer.id == officer_id).first()
     if not officer:
         logger.error("Officer not found for deletion")
         raise HTTPException(status_code=404, detail="Officer not found")
-    officer.archived = True
+    db.delete(officer)
     db.commit()
-    logger.info(f"Officer {officer_id} archived successfully by Officer {current_officer.id}")
-    return {"detail": "Officer archived successfully"}
+    logger.info(f"Officer {officer_id} deleted successfully by Officer {current_officer.id}")
+    return {"detail": "Officer deleted successfully"}
 
-# Endpoint: POST /officers/import
-# Description: Allows an admin to import officer records from an Excel file.
-@router.post("/import", response_model=dict, dependencies=[Depends(admin_required)])
-async def import_officers(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    logger.debug(f"Admin importing officers from file: {file.filename}")
-    if not file.filename.endswith(('.xls', '.xlsx')):
-        logger.error("Invalid file type for import")
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload an Excel file.")
-
-    try:
-        contents = await file.read()
-        import pandas as pd
-        df = pd.read_excel(contents)
-    except Exception as e:
-        logger.error("Error reading Excel file", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
-
-    created_officers = 0
-    for index, row in df.iterrows():
-        if pd.isna(row.get("email")) or pd.isna(row.get("student_number")):
-            continue
-        existing = db.query(models.Officer).filter(
-            (models.Officer.email == row["email"]) | 
-            (models.Officer.student_number == row["student_number"])
-        ).first()
-        if existing:
-            continue
-        officer = models.Officer(
-            full_name=row.get("full_name", ""),
-            email=row["email"],
-            password=row.get("password", ""),
-            student_number=row["student_number"],
-            year=row.get("year", ""),
-            block=row.get("block", ""),
-            position=row.get("position", ""),
-            archived=False
-        )
-        db.add(officer)
-        db.commit()
-        db.refresh(officer)
-        created_officers += 1
-
-    logger.info(f"Imported {created_officers} officers successfully")
-    return {"detail": f"Imported {created_officers} officer(s) successfully."}
