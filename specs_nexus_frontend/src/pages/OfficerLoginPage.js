@@ -55,7 +55,7 @@ const OfficerLoginPage = () => {
             if (e.target.classList.contains('modal')) closeModal();
           }}
         >
-          <div className="modal-content">
+          <div className="modal-contents">
             <span className="close" onClick={closeModal}>&times;</span>
             <h2 className="welcome-title">Officer Login</h2>
             <OfficerLoginForm onLoginSuccess={handleLoginSuccess} />

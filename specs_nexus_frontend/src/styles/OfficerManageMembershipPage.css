@@ -23,28 +23,6 @@
   
 }
 
-.sidebar {
-  font-family: 'Poppins', sans-serif;
-  font-size: 1rem;         /* Base size */
-  color: #ffffff;          /* Adjust for visibility if needed */
-  line-height: 1.6;        /* Optional: improves readability */
-}
-/* When sidebar is closed */
-.sidebar.closed ~ .officer-manage-membership-page {
-  margin-left: 10px; /* Adjust this to match your closed sidebar width */
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .officer-manage-membership-page {
-    margin-left: 0;
-  }
-  
-  .sidebar.open ~ .officer-manage-membership-page {
-    margin-left: 250px;
-  }
-}
-
 
 .dashboard-header {
   display: flex;

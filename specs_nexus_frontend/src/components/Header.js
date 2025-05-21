@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { FaBars, FaTimes } from 'react-icons/fa';
 import '../styles/Header.css';
 
-const Header = () => {
+const Header = ({ toggleSidebar, isSidebarOpen, isMobile }) => {
   const location = useLocation();
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   
@@ -12,7 +13,9 @@ const Header = () => {
     // Remove the slash and capitalize the first letter
     if (path === '/') return 'Home';
     if (path === '/dashboard') return 'Dashboard';
-    return path.substring(1).charAt(0).toUpperCase() + path.substring(2);
+    return path.substring(1).split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.substring(1)
+    ).join(' ');
   };
   
   // Update the date and time every minute
@@ -43,8 +46,19 @@ const Header = () => {
   
   return (
     <div className="header">
-      <h1 className="page-title">{getPageTitle()}</h1>
-      <div className="datetime">{formatDateTime()}</div>
+      <div className="header-left">
+        <button 
+          className="toggle-sidebar-btn" 
+          onClick={toggleSidebar}
+          aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+        >
+          {isSidebarOpen ? <FaTimes /> : <FaBars />}
+        </button>
+        <h1 className="page-title">{getPageTitle()}</h1>
+      </div>
+      <div className="datetime">
+        {formatDateTime()}
+      </div>
     </div>
   );
 };

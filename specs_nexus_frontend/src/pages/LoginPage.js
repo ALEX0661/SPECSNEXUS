@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoginForm from '../components/LoginForm';
 import '../styles/LoginPage.css';
@@ -6,13 +6,36 @@ import '../styles/LoginPage.css';
 const LoginPage = () => {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Handle window resize for responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Show login panel by default on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setShowModal(true);
+    }
+  }, [isMobile]);
 
   const handleLoginSuccess = () => {
     navigate('/dashboard');
   };
 
   const openModal = () => setShowModal(true);
-  const closeModal = () => setShowModal(false);
+  const closeModal = () => {
+    // Only allow closing on desktop
+    if (!isMobile) {
+      setShowModal(false);
+    }
+  };
 
   return (
     <div className="login-page">
@@ -23,40 +46,64 @@ const LoginPage = () => {
             <span className="specs">SPECS</span> <span className="nexus">Nexus</span>
           </h1>
         </div>
-        <button className="login-button" onClick={openModal}>
-          Login
-        </button>
+        {!isMobile && (
+          <button className="login-button" onClick={openModal}>
+            Login
+          </button>
+        )}
       </header>
 
       <div className="container">
-        <div className="right-section">
-          <img src="/images/specslogo.png" alt="SPECS Seal" className="seal-image" />
-        </div>
-
-        <div className="left-section">
-          <ul className="acronym">
-            <li><span>S</span>ociety of</li>
-            <li><span>P</span>rogramming</li>
-            <li><span>E</span>nthusiasts in</li>
-            <li><span>C</span>omputer</li>
-            <li><span>S</span>cience</li>
-          </ul>
-          <div className="seals">
-            <img src="/images/gclogo.png" alt="Gordon College Seal" />
-            <img src="/images/ccslogo.png" alt="CCS Seal" />
-          </div>
-        </div>
+        {isMobile ? (
+          <>
+            <div className="right-section">
+              <img src="/images/specslogo.png" alt="SPECS Seal" className="seal-image" />
+            </div>
+            <div className="left-section">
+              <ul className="acronym">
+                <li><span>S</span>ociety of</li>
+                <li><span>P</span>rogramming</li>
+                <li><span>E</span>nthusiasts in</li>
+                <li><span>C</span>omputer</li>
+                <li><span>S</span>cience</li>
+              </ul>
+              <div className="seals">
+                <img src="/images/gclogo.png" alt="Gordon College Seal" />
+                <img src="/images/ccslogo.png" alt="CCS Seal" />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="left-section">
+              <ul className="acronym">
+                <li><span>S</span>ociety of</li>
+                <li><span>P</span>rogramming</li>
+                <li><span>E</span>nthusiasts in</li>
+                <li><span>C</span>omputer</li>
+                <li><span>S</span>cience</li>
+              </ul>
+              <div className="seals">
+                <img src="/images/gclogo.png" alt="Gordon College Seal" />
+                <img src="/images/ccslogo.png" alt="CCS Seal" />
+              </div>
+            </div>
+            <div className="right-section">
+              <img src="/images/specslogo.png" alt="SPECS Seal" className="seal-image" />
+            </div>
+          </>
+        )}
       </div>
 
       {showModal && (
         <div
-          className="modal"
+          className="login-modal"
           onClick={(e) => {
-            if (e.target.classList.contains('modal')) closeModal();
+            if (e.target.classList.contains('login-modal') && !isMobile) closeModal();
           }}
         >
-          <div className="modal-content">
-            <span className="close" onClick={closeModal}>&times;</span>
+          <div className={`modal-contents ${isMobile ? 'mobile-modal' : ''}`}>
+            {!isMobile && <span className="close" onClick={closeModal}>&times;</span>}
             <h2 className="welcome-title">Welcome!</h2>
             <LoginForm onLoginSuccess={handleLoginSuccess} />
           </div>

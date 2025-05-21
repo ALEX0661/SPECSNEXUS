@@ -79,7 +79,7 @@ const AnnouncementCard = ({ announcement, onClick }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div> 
   );
 };
 

@@ -155,7 +155,7 @@ const OfficerManageAnnouncementsPage = () => {
             </div>
           ) : (
             <div className="no-announcements-message">
-              No announcements found. Click "ADD NEW ANNOUNCEMENT" to create one.
+              No announcements found. Click {"ADD NEW ANNOUNCEMENT"} to create one.
             </div>
           )}
         </div>

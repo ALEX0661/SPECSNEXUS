@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import Sidebar from '../components/Sidebar';
 import { getProfile } from '../services/userService';
 import { getEvents, joinEvent, leaveEvent } from '../services/eventService';
 import EventCard from '../components/EventCard';
 import EventModal from '../components/EventModal';
-import { FaBars } from 'react-icons/fa'; // Importing the sidebar toggle icon
+import Layout from '../components/Layout';
 import '../styles/EventsPage.css';
 
 const backendBaseUrl = "http://localhost:8000";
@@ -15,7 +14,6 @@ const EventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEventsLoading, setIsEventsLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Sidebar toggle state
   const [filter, setFilter] = useState('all'); // Filter for all, upcoming, registered
   const token = localStorage.getItem('accessToken');
 
@@ -112,16 +110,6 @@ const EventsPage = () => {
 
   const filteredEvents = filterEvents();
 
-  const today = new Date();
-  const formattedDate = today.toLocaleString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   // Show full-screen loading state if initial user data is loading
   if (isLoading) {
     return (
@@ -137,19 +125,8 @@ const EventsPage = () => {
   }
 
   return (
-    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}> {/* Conditionally adding sidebar-open class */}
-      <Sidebar user={user} isOpen={isSidebarOpen} /> {/* Passing sidebar open state */}
-      <div className="main-content">
-        <div className="dashboard-header">
-          <div className="dashboard-left">
-            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}> {/* Toggle button */}
-              <FaBars />
-            </button>
-            <h1 className="dashboard-title">Events</h1>
-          </div>
-          <span className="current-date">{formattedDate}</span>
-        </div>
-
+    <Layout user={user}>
+      <div className="events-page">
         <div className="events-header">
           <h1>Community Events</h1>
           <div className="events-filters">
@@ -186,7 +163,7 @@ const EventsPage = () => {
               ))}
             </div>
           ) : (
-            <p>No upcoming events found.</p>
+            <p className="no-events-message">No upcoming events found.</p>
           )}
         </div>
 
@@ -200,7 +177,7 @@ const EventsPage = () => {
           />
         )}
       </div>
-    </div>
+    </Layout>
   );
 };
 

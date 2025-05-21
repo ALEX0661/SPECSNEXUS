@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import Sidebar from '../components/Sidebar';
 import { getProfile } from '../services/userService';
 import { getAnnouncements } from '../services/announcementService';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AnnouncementModal from '../components/AnnouncementModal';
-import { FaBars } from 'react-icons/fa';
+import Layout from '../components/Layout';
 import '../styles/AnnouncementsPage.css';
 
 const AnnouncementsPage = () => {
@@ -13,7 +12,6 @@ const AnnouncementsPage = () => {
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnnouncementsLoading, setIsAnnouncementsLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [filter, setFilter] = useState('all');
   const token = localStorage.getItem('accessToken');
 
@@ -70,18 +68,13 @@ const AnnouncementsPage = () => {
 
   const filteredAnnouncements = filterAnnouncements();
 
-  const today = new Date();
-  const formattedDate = today.toLocaleString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   if (isLoading) {
-    return <div className="loading">Loading user data...</div>;
+    return (
+      <div className="loading">
+        <div className="loader"></div>
+        <p>Loading Announcements...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -89,22 +82,8 @@ const AnnouncementsPage = () => {
   }
 
   return (
-    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-      <Sidebar user={user} isOpen={isSidebarOpen} />
-      <div className="main-content">
-        <div className="dashboard-header">
-          <div className="dashboard-left">
-            <button
-              className="sidebar-toggle-inside"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            >
-              <FaBars />
-            </button>
-            <h1>Announcements</h1>
-          </div>
-          <span className="current-date">{formattedDate}</span>
-        </div>
-
+    <Layout user={user}>
+      <div className="announcements-page">
         <div className="announcements-header">
           <h1>SPECS Announcements</h1>
           <div className="announcements-filters">
@@ -160,7 +139,7 @@ const AnnouncementsPage = () => {
           />
         )}
       </div>
-    </div>
+    </Layout>
   );
 };
 

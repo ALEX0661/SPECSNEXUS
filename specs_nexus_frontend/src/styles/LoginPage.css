@@ -1,8 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Konkhmer+Sleokchher&display=swap');
 
-*{
-
+* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -11,13 +10,24 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background-color: #253F21;
 }
 
 .login-page {
   font-family: 'Dela Gothic One', sans-serif;
-  background-color: #253F21 ;
+  background-color: #253F21;
   color: white;
-  height: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
 }
 
 .site-header {
@@ -49,7 +59,7 @@ html, body {
 }
 
 .specs {
-  font-size:40px;
+  font-size: 40px;
   color: #ffffff;
   margin-right: 0.3rem;
 }
@@ -67,26 +77,26 @@ html, body {
   cursor: pointer;
   transition: background-color 0.3s;
   font-size: 16px;
-  font-family: 'Poppins', regular;
+  font-family: 'Poppins', sans-serif;
 }
 
 .login-button:hover {
   background-color: #3a4218;
-  color:#ffffff;
+  color: #ffffff;
 }
 
 .container {
   position: relative;
   display: flex;
+  flex: 1;
   justify-content: space-between;
   align-items: center;
-  height: calc(100vh - 100px);
   overflow: hidden;
   padding: 1rem 2rem;
 }
 
 .left-section {
-  width: 80%;
+  width: 50%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -109,7 +119,9 @@ html, body {
 }
 
 .seals {
-  margin-top: 7rem;
+  margin-top: 3rem;
+  display: flex;
+  align-items: center;
 }
 
 .seals img {
@@ -118,65 +130,50 @@ html, body {
 }
 
 .right-section {
-  position: absolute;
-    top: 0; /* Ensure it aligns with the top */
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
+  width: 50%;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: center;
-  pointer-events: none;
-  overflow: hidden;
-  transform: scale(1.2);
-  padding-right: 5vw;
+  position: relative;
 }
 
 .seal-image {
-  width: 560px; /* Set a larger width */
-  height: 560px; /* Set a larger height */
-  object-fit: cover; /* Ensure the image scales properly */
-  border: 5px solid #ffffff; /* White border */
-  border-radius: 50%; /* Circular shape */
-  box-shadow: 4 4px 8px rgba(0, 0, 0, 0.5); /* Add a shadow for better visibility */
-  margin-right: 30px; /* Move the image slightly to the left */
-  margin-top: -60px; /* Remove any top margin */
+  width: 400px;
+  height: 400px;
+  object-fit: cover;
+  border: 5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
 }
 
-.modal {
+/* Login Modal Styles */
+.login-modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 999;
 }
 
-.modal-content {
+.modal-contents {
   background-color: #fff;
-  border-radius: 25px;
-  width: 325px;
-  min-height: 375px;
+  border-radius: 25px 25px 25px 25px;
+  width: 450px;
   padding: 40px 30px;
   position: relative;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-  animation: slideDown 0.4s ease-out;
+  box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.2);
   font-family: 'Konkhmer Sleokchher', sans-serif;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+  animation: slideUp 0.4s ease-out;
 }
 
-@keyframes slideDown {
+@keyframes slideUp {
   from {
-    transform: translateY(-20px);
+    transform: translateY(100%);
     opacity: 0;
   }
   to {
@@ -189,15 +186,14 @@ html, body {
   font-family: 'Dela Gothic One', cursive;
   font-size: 2.5rem;
   text-align: center;
-  margin-bottom: 45px;
+  margin-bottom: 30px;
   color: #333;
-  margin-top: -10px;
 }
 
 .close {
   position: absolute;
-  top: 10px;
-  right: 15px;
+  top: 15px;
+  right: 20px;
   font-size: 28px;
   color: #aaa;
   cursor: pointer;
@@ -207,116 +203,208 @@ html, body {
   color: #000;
 }
 
-.modal-content input {
+.login-form {
   width: 100%;
-  padding: 10px;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 15px;
   margin-bottom: 20px;
   font-size: 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   border-radius: 25px;
   transition: border-color 0.2s;
 }
 
-.modal-content input:focus {
+.login-form input:focus {
   outline: none;
   border-color: #4B5320;
+  box-shadow: 0 0 0 2px rgba(75, 83, 32, 0.2);
 }
 
 .error {
-  color: red;
+  color: #e53935;
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
 }
 
-.modal-content button.modal-login-button {
-  width: 150px;
-  padding: 10px 20px;
-  font-size: 15px;
+.modal-login-button {
+  width: 100%;
+  padding: 15px;
+  font-size: 1rem;
   border: none;
-  border-radius: 30px;
-  background-color: #253F21; 
-  color: #fff; 
+  border-radius: 25px;
+  background-color: #253F21;
+  color: #fff;
   cursor: pointer;
-  transition: background-color 0.3s, transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); 
+  transition: background-color 0.3s, transform 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-weight: bold;
 }
 
-.modal-content button.modal-login-button:hover {
-  background-color: #253F21; 
-  color: #ffffff; 
-  transform: scale(1.05); 
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3); 
+.modal-login-button:hover {
+  background-color: #3a4218;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
+
+.modal-login-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.officer-login-link {
+  margin-top: 1rem;
+  text-align: center;
+  font-family: 'Konkhmer Sleokchher', sans-serif;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.officer-login-link a {
+  color: #f47c3c;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.officer-login-link a:hover {
+  text-decoration: underline;
+}
+
+/* Mobile Responsive Styles */
 @media (max-width: 768px) {
-  .site-header {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 12px 20px;
-  }
-
-  .header-title {
-    font-size: 1.6rem;
-    margin-top: 8px;
-  }
-
-  .login-button {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    font-size: 1rem;
-  }
-
-  .container {
-    flex-direction: column;
-    align-items: center;
-    padding: 1rem;
-    height: auto;
+  .login-page {
     overflow-y: auto;
+    min-height: 100%;
+    height: auto;
   }
-
-  .left-section {
-    width: 100%;
-    align-items: center;
-    text-align: center;
-  }
-
-  .acronym {
-    font-size: 2rem;
-    line-height: 3rem;
-  }
-
-  .right-section {
-    display: none; /* hide decorative image on mobile */
-  }
-
-  .modal-content {
-    width: 90%;
-    padding: 25px 20px;
-  }
-
-  .welcome-title {
-    font-size: 1.8rem;
-  }
-
-  .modal-content input {
-    font-size: 0.9rem;
-  }
-
-  .modal-content button.modal-login-button {
-    width: 100%;
-    font-size: 1rem;
-  }
-
-  .seals {
-    margin-top: 2rem;
-    display: flex;
+  
+  .site-header {
+    padding: 15px;
     justify-content: center;
-    flex-wrap: wrap;
   }
-
-
-  .seals img {
-    margin: 5px;
+  
+  .header-content {
+    justify-content: center;
+  }
+  
+  .header-logo {
     width: 50px;
   }
+  
+  .header-title {
+    font-size: 1.8rem;
+  }
+  
+  .specs {
+    font-size: 30px;
+  }
+  
+  .login-button {
+    display: none; /* Hide desktop login button on mobile */
+  }
+  
+  .container {
+    flex-direction: column;
+    padding: 0;
+    height: auto;
+    flex: 1;
+    /* Ensure enough space for the modal */
+    padding-bottom: 50px;
+  }
+  
+  .left-section, .right-section {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .left-section {
+    padding: 20px;
+  }
+  
+  .right-section {
+    padding: 20px 0;
+  }
+  
+  .acronym {
+    font-size: 1.8rem;
+    line-height: 2rem;
+    letter-spacing: 2px;
+  }
+  
+  .seals {
+    justify-content: center;
+    margin-top: 1.5rem;
+    margin-bottom: 30px; /* Add space before the login form */
+  }
+  
+  .seals img {
+    width: 45px;
+    margin: 0 5px;
+  }
+  
+  .seal-image {
+    width: 180px;
+    height: 180px;
+    border-width: 3px;
+  }
+  
+  /* Mobile Login Panel */
+  .login-modal {
+    background: none;
+    align-items: flex-end;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+  }
+  
+  .modal-contents {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 30px 20px 40px; /* Added bottom padding */
+    margin-bottom: 0;
+    min-height: 50vh; /* Take at least half the viewport */
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.25);
+  }
+  
+  .welcome-title {
+    font-size: 2rem;
+    margin-bottom: 20px;
+  }
+  
+  /* Fix for iOS devices to ensure modal goes to bottom edge */
+  .mobile-modal {
+    border-radius: 20px 20px 0 0;
+    margin-bottom: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 40px);
+  }
+  
+  .officer-login-link {
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+  }
+}
+
+/* Animation for mobile login panel */
+.slide-up-enter {
+  transform: translateY(100%);
+}
+
+.slide-up-enter-active {
+  transform: translateY(0);
+  transition: transform 0.3s ease;
+}
+
+.slide-up-exit {
+  transform: translateY(0);
+}
+
+.slide-up-exit-active {
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
 }

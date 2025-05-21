@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getProfile } from '../services/userService';
 import { getMemberships } from '../services/membershipService';
-import Sidebar from '../components/Sidebar';
 import MembershipModal from '../components/MembershipModal';
-import { FaBars } from 'react-icons/fa';
+import Layout from '../components/Layout';
 import '../styles/MembershipPage.css';
 
 const MembershipPage = () => {
@@ -12,7 +11,6 @@ const MembershipPage = () => {
   const [selectedMembership, setSelectedMembership] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMemberships, setLoadingMemberships] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const token = localStorage.getItem('accessToken');
 
   useEffect(() => {
@@ -59,29 +57,40 @@ const MembershipPage = () => {
   const getProgressData = (status, denialReason) => {
     const lower = status ? status.trim().toLowerCase() : "";
     let progressPercentage = 0;
-    let progressColor = "#ccc";
+    let progressColor = "#e0e0e0";
     let displayStatus = status;
+    let statusClass = "";
+    
     if (lower === "not paid") {
       if (denialReason) {
         progressPercentage = 0;
         progressColor = "#dc3545";
         displayStatus = "Denied";
+        statusClass = "status-denied";
       } else {
         progressPercentage = 0;
-        progressColor = "#ccc";
+        progressColor = "#e0e0e0";
+        statusClass = "status-not-paid";
       }
     } else if (lower === "verifying") {
       progressPercentage = 50;
-      progressColor = "#28a745";
+      progressColor = "#ffc107";
+      statusClass = "status-verifying";
     } else if (lower === "paid") {
       progressPercentage = 100;
       progressColor = "#28a745";
+      statusClass = "status-paid";
     }
-    return { progressPercentage, progressColor, displayStatus };
+    return { progressPercentage, progressColor, displayStatus, statusClass };
   };
 
   if (isLoading) {
-    return <div className="loading">Loading Membership Information...</div>;
+    return (
+      <div className="page-loading">
+        <div className="loader"></div>
+        <p>Loading Membership Information...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -100,142 +109,145 @@ const MembershipPage = () => {
     (m) => m.payment_status?.trim().toLowerCase() === "paid"
   );
 
-  return (
-    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-      <Sidebar user={user} isOpen={isSidebarOpen} />
-      <div className="main-content">
-        <div className="dashboard-header">
-          <div className="dashboard-left">
-            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-              <FaBars />
-            </button>
-            <h1>My Membership Requirements</h1>
+  // Reusable component for membership card
+  const MembershipCard = ({ membership }) => {
+    const { progressPercentage, progressColor, displayStatus, statusClass } = getProgressData(
+      membership.payment_status, 
+      membership.denial_reason
+    );
+
+    const formatDate = (dateString) => {
+      if (!dateString) return "Not available";
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).format(date);
+    };
+    
+    return (
+      <div
+        className={`membership-card ${statusClass}`}
+        onClick={() => setSelectedMembership(membership)}
+      >
+        <div className="card-badge" style={{ backgroundColor: progressColor }}>
+          {displayStatus}
+        </div>
+        <div className="membership-card-inner">
+          <div className="card-header">
+            <div className="requirement-icon"></div>
+            <h3 className="requirement-name">{membership.requirement || "N/A"}</h3>
+          </div>
+          
+          <div className="progress-container">
+            <div className="progress-label">
+              <span>Progress</span>
+              <span>{progressPercentage}%</span>
+            </div>
+            <div className="progress-bar-container">
+              <div
+                className="progress-bar"
+                style={{ width: `${progressPercentage}%`, backgroundColor: progressColor }}
+              ></div>
+            </div>
+          </div>
+          
+          <div className="membership-details">
+            <div className="detail-group">
+              <div className="detail-item">
+                <span className="detail-label">Amount:</span>
+                <span className="detail-value">₱{membership.amount || "0"}</span>
+              </div>
+              
+              {membership.due_date && (
+                <div className="detail-item">
+                  <span className="detail-label">Due Date:</span>
+                  <span className="detail-value">{formatDate(membership.due_date)}</span>
+                </div>
+              )}
+              
+              {membership.receipt_path && (
+                <div className="detail-item">
+                  <span className="detail-label">Receipt:</span>
+                  <span className="detail-value receipt-available">
+                    <span className="receipt-icon"></span>Available
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            {membership.denial_reason && (
+              <div className="denial-reason">
+                <div className="denial-header">
+                  <span className="warning-icon"></span>
+                  <span>Payment Denied</span>
+                </div>
+                <p className="reason-text">{membership.denial_reason}</p>
+              </div>
+            )}
+            
+            <div className="card-cta">
+              <button className="view-details-btn">View Details</button>
+            </div>
           </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* Not Paid or Denied Section */}
-        <div className="membership-section">
-          <h2>Not Paid / Denied Memberships</h2>
-          {loadingMemberships ? (
-            <div className="membership-loading">
-              <div className="loading-indicator">Loading membership data...</div>
-            </div>
-          ) : notPaidOrDeniedMemberships.length > 0 ? (
-            <div className="memberships-grid">
-              {notPaidOrDeniedMemberships.map((membership) => {
-                const status = membership.payment_status || "";
-                const { progressPercentage, progressColor, displayStatus } = getProgressData(status, membership.denial_reason);
-                return (
-                  <div
-                    key={membership.id}
-                    className="membership-card"
-                    onClick={() => setSelectedMembership(membership)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="progress-bar-container">
-                      <div
-                        className="progress-bar"
-                        style={{ width: `${progressPercentage}%`, backgroundColor: progressColor }}
-                      >
-                        {displayStatus}
-                      </div>
-                    </div>
-                    <div className="membership-details">
-                      <p><strong>Requirement:</strong> {membership.requirement || "N/A"}</p>
-                      <p><strong>Amount:</strong> ₱{membership.amount || "0"}</p>
-                      <p><strong>Membership ID:</strong> {membership.id}</p>
-                      {membership.denial_reason && (
-                        <p><strong>Denial Reason:</strong> {membership.denial_reason}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p>No not paid or denied memberships.</p>
-          )}
+  // Reusable section component
+  const MembershipSection = ({ title, memberships, emptyMessage, iconClass }) => {
+    return (
+      <div className={`membership-section ${iconClass}`}>
+        <div className="section-header">
+          <div className="section-icon"></div>
+          <h2>{title}</h2>
         </div>
+        
+        {loadingMemberships ? (
+          <div className="membership-loading">
+            <div className="loading-indicator">Loading membership data...</div>
+          </div>
+        ) : memberships.length > 0 ? (
+          <div className="memberships-grid">
+            {memberships.map((membership) => (
+              <MembershipCard key={membership.id} membership={membership} />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon"></div>
+            <p>{emptyMessage}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-        {/* Verifying Section */}
-        <div className="membership-section">
-          <h2>Verifying Memberships</h2>
-          {loadingMemberships ? (
-            <div className="membership-loading">
-              <div className="loading-indicator">Loading membership data...</div>
-            </div>
-          ) : verifyingMemberships.length > 0 ? (
-            <div className="memberships-grid">
-              {verifyingMemberships.map((membership) => {
-                const { progressPercentage, progressColor, displayStatus } = getProgressData(membership.payment_status, membership.denial_reason);
-                return (
-                  <div
-                    key={membership.id}
-                    className="membership-card"
-                    onClick={() => setSelectedMembership(membership)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="progress-bar-container">
-                      <div
-                        className="progress-bar"
-                        style={{ width: `${progressPercentage}%`, backgroundColor: progressColor }}
-                      >
-                        {displayStatus}
-                      </div>
-                    </div>
-                    <div className="membership-details">
-                      <p><strong>Requirement:</strong> {membership.requirement || "N/A"}</p>
-                      <p><strong>Amount:</strong> ₱{membership.amount || "0"}</p>
-                      <p><strong>Membership ID:</strong> {membership.id}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p>No memberships in verifying status.</p>
-          )}
-        </div>
+  return (
+    <Layout user={user}>
+      <div className="membership-page">
+        <MembershipSection 
+          title="Not Paid / Denied Memberships" 
+          memberships={notPaidOrDeniedMemberships}
+          emptyMessage="You have no unpaid or denied memberships."
+          iconClass="unpaid-section"
+        />
 
-        {/* Paid Section */}
-        <div className="membership-section">
-          <h2>Paid Memberships</h2>
-          {loadingMemberships ? (
-            <div className="membership-loading">
-              <div className="loading-indicator">Loading membership data...</div>
-            </div>
-          ) : paidMemberships.length > 0 ? (
-            <div className="memberships-grid">
-              {paidMemberships.map((membership) => {
-                const { progressPercentage, progressColor, displayStatus } = getProgressData(membership.payment_status, membership.denial_reason);
-                return (
-                  <div
-                    key={membership.id}
-                    className="membership-card"
-                    onClick={() => setSelectedMembership(membership)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="progress-bar-container">
-                      <div
-                        className="progress-bar"
-                        style={{ width: `${progressPercentage}%`, backgroundColor: progressColor }}
-                      >
-                        {displayStatus}
-                      </div>
-                    </div>
-                    <div className="membership-details">
-                      <p><strong>Requirement:</strong> {membership.requirement || "N/A"}</p>
-                      <p><strong>Amount:</strong> ₱{membership.amount || "0"}</p>
-                      <p><strong>Membership ID:</strong> {membership.id}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p>No paid memberships yet.</p>
-          )}
-        </div>
+        <MembershipSection 
+          title="Verifying Memberships" 
+          memberships={verifyingMemberships}
+          emptyMessage="You have no memberships in verification status."
+          iconClass="verifying-section"
+        />
+
+        <MembershipSection 
+          title="Paid Memberships" 
+          memberships={paidMemberships}
+          emptyMessage="You have no paid memberships yet."
+          iconClass="paid-section"
+        />
 
         {selectedMembership && (
           <MembershipModal
@@ -245,7 +257,7 @@ const MembershipPage = () => {
           />
         )}
       </div>
-    </div>
+    </Layout>
   );
 };
 

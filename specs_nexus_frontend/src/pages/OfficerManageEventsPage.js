@@ -154,7 +154,7 @@ const OfficerManageEventsPage = () => {
               ))}
             </div>
           ) : (
-            <div className="no-events-message">No events found. Click "ADD NEW EVENT" to create one.</div>
+            <div className="no-events-message">No events found. Click {"ADD NEW EVENT"} to create one.</div>
           )}
         </div>
 

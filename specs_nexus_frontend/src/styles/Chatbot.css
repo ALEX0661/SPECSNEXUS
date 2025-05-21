@@ -19,7 +19,6 @@
   font-size: 32px; /* Increased from 28px */
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
   transition: transform 0.3s ease;
 }
 

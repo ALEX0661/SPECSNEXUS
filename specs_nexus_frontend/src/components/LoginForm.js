@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { login } from '../services/authService';
 
 const LoginForm = ({ onLoginSuccess }) => {
@@ -9,13 +10,22 @@ const LoginForm = ({ onLoginSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!emailOrStudentNumber.trim() || !password.trim()) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
     setError('');
     setIsLoading(true);
+    
     try {
       const response = await login({ emailOrStudentNumber, password });
       localStorage.setItem('accessToken', response.access_token);
       onLoginSuccess(response);
     } catch (err) {
+      console.error('Login error:', err);
       setError('Invalid credentials. Please try again.');
     } finally {
       setIsLoading(false);
@@ -34,6 +44,7 @@ const LoginForm = ({ onLoginSuccess }) => {
             value={emailOrStudentNumber}
             onChange={(e) => setEmailOrStudentNumber(e.target.value)}
             required
+            disabled={isLoading}
           />
         </div>
         <div>
@@ -44,11 +55,22 @@ const LoginForm = ({ onLoginSuccess }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={isLoading}
           />
         </div>
-        <button type="submit" className="modal-login-button" disabled={isLoading}>
+        <button 
+          type="submit" 
+          className="modal-login-button" 
+          disabled={isLoading}
+        >
           {isLoading ? 'Logging in...' : 'Log In'}
         </button>
+        <div className="officer-login-link">
+          <p>
+            Are you an officer?{' '}
+            <Link to="/officer-login">Log in here</Link>
+          </p>
+        </div>
       </form>
     </div>
   );

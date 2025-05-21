@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaBars } from 'react-icons/fa';
-import OfficerSidebar from '../components/OfficerSidebar';
+import OfficerLayout from '../components/OfficerLayout';
 import {
   getOfficerMemberships,
   createOfficerMembership,
@@ -18,7 +17,6 @@ import OfficerDenialReasonModal from '../components/OfficerDenialReasonModal';
 import '../styles/OfficerManageMembershipPage.css';
 
 const OfficerManageMembershipPage = () => {
-  const [officer, setOfficer] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [requirements, setRequirements] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -33,7 +31,6 @@ const OfficerManageMembershipPage = () => {
   const [filterYear, setFilterYear] = useState('All');
   const [filterRequirement, setFilterRequirement] = useState('All');
   const [searchName, setSearchName] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   const token = localStorage.getItem('officerAccessToken');
@@ -48,9 +45,7 @@ const OfficerManageMembershipPage = () => {
     async function fetchOfficerInfo() {
       try {
         const storedOfficer = localStorage.getItem('officerInfo');
-        if (storedOfficer) {
-          setOfficer(JSON.parse(storedOfficer));
-        } else {
+        if (!storedOfficer) {
           navigate('/officer-login');
         }
       } catch (error) {
@@ -252,28 +247,9 @@ const OfficerManageMembershipPage = () => {
     return <div>Loading Officer Info...</div>;
   }
 
-  if (!officer) {
-    return null; // Redirect handled in useEffect
-  }
-
   return (
-    <div className="officer-manage-membership-layout">
-      <OfficerSidebar 
-        officer={officer} 
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        className="officer-membership-sidebar"
-      />
+    <OfficerLayout>
       <div className="officer-manage-membership-page">
-        <div className="dashboard-header">
-          <div className="dashboard-left">
-            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-              <FaBars />
-            </button>
-            <h1 className="dashboard-title">Manage Membership</h1>
-          </div>
-        </div>
-              
         <div className="events-grid">
           <div className="membership-tabs">
             <button className={activeTab === 'all' ? 'active' : ''} onClick={() => handleTabChange('all')}>
@@ -478,7 +454,7 @@ const OfficerManageMembershipPage = () => {
           />
         )}
       </div>
-    </div>
+    </OfficerLayout>
   );
 };
 

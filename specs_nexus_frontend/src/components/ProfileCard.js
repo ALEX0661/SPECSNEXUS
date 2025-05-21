@@ -1,3 +1,4 @@
+// ProfileCard.js
 import React from 'react';
 import '../styles/ProfilePage.css';
 
@@ -18,7 +19,7 @@ const ProfileCard = ({ user }) => {
         <span className="value">{user.year} {user.block}</span>
       </div>
       <div className="profile-field">
-        <span className="label">Email Address (Domain):</span>
+        <span className="label">Email Address:</span>
         <span className="value">{user.email}</span>
       </div>
     </div>
