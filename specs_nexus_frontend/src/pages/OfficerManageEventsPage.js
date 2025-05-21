@@ -1,14 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import OfficerLayout from '../components/OfficerLayout';
-import {
-  getOfficerEvents,
-  createOfficerEvent,
-  updateOfficerEvent,
-  deleteOfficerEvent,
-  getEventParticipants
-} from '../services/officerEventService';
+import OfficerSidebar from '../components/OfficerSidebar';
+import { getOfficerEvents, createOfficerEvent, updateOfficerEvent, deleteOfficerEvent, getEventParticipants } from '../services/officerEventService';
 import EventParticipantsModal from '../components/EventParticipantsModal';
 import OfficerEventModal from '../components/OfficerEventModal';
+import { FaBars } from 'react-icons/fa'; // Toggle icon
 import '../styles/OfficerManageEventsPage.css';
 
 const OfficerManageEventsPage = () => {
@@ -18,32 +13,29 @@ const OfficerManageEventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [participants, setParticipants] = useState([]);
-  const [filter, setFilter] = useState('all'); // all, upcoming, past
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const token = localStorage.getItem('officerAccessToken');
 
   useEffect(() => {
-    const storedOfficer = localStorage.getItem('officerInfo');
-    if (storedOfficer) {
-      setOfficer(JSON.parse(storedOfficer));
-    }
-  }, []);
-
-  useEffect(() => {
-    async function fetchAllEvents() {
+    async function fetchData() {
       try {
-        setLoading(true);
-        const data = await getOfficerEvents(token);
-        setEvents(data);
-        setLoading(false);
+        const storedOfficer = localStorage.getItem('officerInfo');
+        const officerData = storedOfficer ? JSON.parse(storedOfficer) : null;
+        setOfficer(officerData);
+
+        if (token) {
+          const eventsData = await getOfficerEvents(token);
+          setEvents(eventsData);
+        }
       } catch (error) {
-        console.error("Failed to fetch events:", error);
-        setLoading(false);
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setIsLoading(false);
       }
     }
-    if (token) {
-      fetchAllEvents();
-    }
+
+    fetchData();
   }, [token]);
 
   const handleAddNewEvent = () => {
@@ -79,13 +71,8 @@ const OfficerManageEventsPage = () => {
     }
   };
 
-  const handleCloseEventModal = () => {
-    setShowEventModal(false);
-  };
-
-  const handleCloseParticipantsModal = () => {
-    setShowParticipantsModal(false);
-  };
+  const handleCloseEventModal = () => setShowEventModal(false);
+  const handleCloseParticipantsModal = () => setShowParticipantsModal(false);
 
   const handleSave = async (formData, eventId) => {
     try {
@@ -105,190 +92,72 @@ const OfficerManageEventsPage = () => {
     }
   };
 
-  const getRegistrationStatusBadge = (status) => {
-    const statusConfig = {
-      open: { class: 'status-badge status-open', icon: 'fa-door-open', text: 'REGISTRATION OPEN' },
-      not_started: { class: 'status-badge status-not-started', icon: 'fa-clock', text: 'OPENS SOON' },
-      closed: { class: 'status-badge status-closed', icon: 'fa-lock', text: 'REGISTRATION CLOSED' }
-    };
-    
-    const config = statusConfig[status] || { class: 'status-badge', icon: 'fa-question-circle', text: 'UNKNOWN' };
-    
-    return (
-      <div className={config.class}>
-        <i className={`fas ${config.icon}`}></i> {config.text}
-      </div>
-    );
-  };
-
-  const formatEventDate = (dateString) => {
-    const date = new Date(dateString);
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    return {
-      formatted: date.toLocaleDateString(undefined, options),
-      day: date.getDate(),
-      month: date.toLocaleDateString('en-US', { month: 'short' }),
-      time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    };
-  };
-
-  const filterEvents = () => {
-    const now = new Date();
-    
-    if (filter === 'all') {
-      return events;
-    } else if (filter === 'upcoming') {
-      return events.filter(event => new Date(event.date) >= now);
-    } else if (filter === 'past') {
-      return events.filter(event => new Date(event.date) < now);
-    }
-    return events;
-  };
-
-  const filteredEvents = filterEvents();
-
-  if (loading) {
-    return (
-      <OfficerLayout officer={officer}>
-        <div className="officer-manage-events-page loading">
-          <div className="loader"></div>
-          <p>Loading events...</p>
-        </div>
-      </OfficerLayout>
-    );
-  }
+  if (isLoading) return <div className="loading">Loading Events...</div>;
+  if (!officer) return <div className="error-message">Unable to load officer information. Please try again later.</div>;
 
   return (
-    <OfficerLayout officer={officer}>
-      <div className="officer-manage-events-page">
-        <div className="events-header">
-          <h1>Manage Events</h1>
-          <div className="events-actions">
-            <div className="events-filters">
-              <button 
-                className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-                onClick={() => setFilter('all')}
-              >
-                All Events
-              </button>
-              <button 
-                className={`filter-btn ${filter === 'upcoming' ? 'active' : ''}`}
-                onClick={() => setFilter('upcoming')}
-              >
-                Upcoming
-              </button>
-              <button 
-                className={`filter-btn ${filter === 'past' ? 'active' : ''}`}
-                onClick={() => setFilter('past')}
-              >
-                Past
-              </button>
-            </div>
-            <button className="add-event-btn" onClick={handleAddNewEvent}>
-              <i className="fas fa-plus"></i> ADD NEW EVENT
+    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <OfficerSidebar officer={officer} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+
+      <div className="main-content">
+        <div className="dashboard-header">
+          <div className="dashboard-left">
+            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              <FaBars />
             </button>
+            <h1 className="dashboard-title">Manage Events</h1>
           </div>
+          <button className="add-event-btn" onClick={handleAddNewEvent}>ADD NEW EVENT</button>
         </div>
-        
-        <div className="events-grid">
-          {filteredEvents.length > 0 ? (
-            filteredEvents.map((evt) => (
-              <div key={evt.id} className="event-card officer-event-card">
-                <div className="event-card-inner">
-                  {/* Date badge */}
-                  <div className="event-date-badge">
-                    <div className="event-month">{formatEventDate(evt.date).month}</div>
-                    <div className="event-day">{formatEventDate(evt.date).day}</div>
-                  </div>
-                  
-                  {/* Event image */}
-                  <div className="event-image-wrapper">
+
+        <div className="events-section">
+          {events.length > 0 ? (
+            <div className="events-grid">
+              {events.map((evt) => (
+                <div key={evt.id} className="event-card">
+                  <div className="event-image-wrapper" onClick={() => handleViewParticipants(evt.id)}>
                     <img
-                      src={
-                        evt.image_url
-                          ? (evt.image_url.startsWith("http")
-                              ? evt.image_url
-                              : `http://localhost:8000${evt.image_url}`)
-                          : "/default_event.png"
-                      }
+                      src={evt.image_url?.startsWith("http") ? evt.image_url : `http://localhost:8000${evt.image_url}`}
                       alt={evt.title}
                       className="event-image"
+                      style={{ cursor: 'pointer' }}
                     />
                     <div className="image-overlay"></div>
-                    {getRegistrationStatusBadge(evt.registration_status)}
-                    
-                    <div className="participants-badge" onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewParticipants(evt.id);
-                    }}>
-                      <i className="fas fa-users"></i> {evt.participant_count}
-                    </div>
                   </div>
-                  
-                  {/* Event content */}
+
                   <div className="event-content">
                     <h3 className="event-title">{evt.title}</h3>
-                    
+
                     <div className="event-info">
                       <div className="event-info-item">
-                        <i className="fas fa-clock event-icon"></i>
-                        <span>{formatEventDate(evt.date).time}</span>
+                        <span className="event-icon">📅</span>
+                        <span>{new Date(evt.date).toLocaleString()}</span>
                       </div>
                       <div className="event-info-item">
-                        <i className="fas fa-map-marker-alt event-icon"></i>
+                        <span className="event-icon">📍</span>
                         <span>{evt.location}</span>
                       </div>
-                      
-                      {evt.registration_start && (
-                        <div className="event-info-item">
-                          <i className="fas fa-calendar-plus event-icon"></i>
-                          <span>Reg. Opens: {formatEventDate(evt.registration_start).formatted}</span>
-                        </div>
-                      )}
-                      
-                      {evt.registration_end && (
-                        <div className="event-info-item">
-                          <i className="fas fa-calendar-times event-icon"></i>
-                          <span>Reg. Closes: {formatEventDate(evt.registration_end).formatted}</span>
-                        </div>
-                      )}
+                      <div className="event-info-item">
+                        <span className="event-icon">📝</span>
+                        <span>
+                          {evt.description.length > 100 ? evt.description.slice(0, 100) + '...' : evt.description}
+                        </span>
+                      </div>
                     </div>
-                    
+
                     <div className="card-actions">
-                      <button className="edit-btn" onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(evt);
-                      }}>
-                        <i className="fas fa-edit"></i> Edit
-                      </button>
-                      <button className="delete-btn" onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(evt.id);
-                      }}>
-                        <i className="fas fa-trash-alt"></i> Delete
-                      </button>
+                      <button onClick={() => handleEdit(evt)}>Edit</button>
+                      <button onClick={() => handleDelete(evt.id)}>Delete</button>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <div className="no-events-message">
-              <i className="fas fa-calendar-times"></i>
-              <p>No events found for the selected filter.</p>
-              <button className="add-event-btn small" onClick={handleAddNewEvent}>
-                <i className="fas fa-plus"></i> Create Your First Event
-              </button>
+              ))}
             </div>
+          ) : (
+            <div className="no-events-message">No events found. Click "ADD NEW EVENT" to create one.</div>
           )}
         </div>
-        
+
         <OfficerEventModal
           show={showEventModal}
           onClose={handleCloseEventModal}
@@ -301,7 +170,7 @@ const OfficerManageEventsPage = () => {
           onClose={handleCloseParticipantsModal}
         />
       </div>
-    </OfficerLayout>
+    </div>
   );
 };
 

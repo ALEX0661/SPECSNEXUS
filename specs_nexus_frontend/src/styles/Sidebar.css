@@ -1,96 +1,75 @@
 .sidebar {
-  width: 240px;
-  height: 100vh;
-  background-color: #2d5641; /* Dark green color from the image */
-  color: white;
+  position: fixed;
+  top: 0;
+  left: -220px;
+  height: 100%;
+  width: 200px;
+  background-color: #253f21 !important;
   display: flex;
   flex-direction: column;
-  padding: 0;
-  position: fixed;
+  align-items: center;
+  padding: 1rem;
+  color: #fff;
+  transition: left 0.3s ease;
+  z-index: 1000;
+}
+
+.sidebar.open {
   left: 0;
-  top: 0;
 }
 
-.user-info {
-  padding: 20px 15px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 20px;
-}
-
-.user-info h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.user-info p {
-  margin: 5px 0 0;
-  font-size: 14px;
-  opacity: 0.8;
-}
-
-.sidebar nav {
-  flex: 1;
-}
-
-.sidebar ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.sidebar li {
-  margin-bottom: 5px;
-}
-
-.sidebar a {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  color: white;
-  text-decoration: none;
-  transition: background-color 0.2s;
-}
-
-.sidebar a:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.sidebar a.active {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-left: 4px solid white;
-  padding-left: 16px;
-}
-
-.sidebar svg {
-  margin-right: 12px;
-  stroke: white;
-}
-
-.logout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  margin: 20px;
-  margin-top: auto;
-  padding: 12px 20px;
+.sidebar .close-btn {
+  align-self: flex-end;
   background: none;
   border: none;
-  color: white;
+  color: #fff;
+  font-size: 1.2rem;
   cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.2s;
-  width: calc(100% - 40px);
+  margin-bottom: 1rem;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background-color: #253f21;
+  color: #f23a3a !important;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  font-size: 1.25rem;
   border-radius: 4px;
+  cursor: pointer;
+  z-index: 1100;
 }
 
-.logout-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.layout-container {
+  display: flex;
 }
 
-.logout-btn svg {
-  margin-right: 12px;
+.main-content {
+  flex: 1;
+  margin-left: 0;
+  transition: margin-left 0.3s ease;
+  padding: 2rem;
+}
+
+.sidebar-open .main-content {
+  margin-left: 200px;
+}
+
+/* Keep other styles like .user-info, nav, buttons as-is */
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: -1rem;
+}
+
+.profile-icon {
+  font-size: 80px;
+  color: #ffffff;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 
 

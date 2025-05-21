@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import OfficerLayout from '../components/OfficerLayout';
+import OfficerSidebar from '../components/OfficerSidebar';
 import {
   getOfficerAnnouncements,
   createOfficerAnnouncement,
@@ -8,37 +8,37 @@ import {
 } from '../services/officerAnnouncementService';
 import OfficerAnnouncementModal from '../components/OfficerAnnouncementModal';
 import '../styles/OfficerManageAnnouncementsPage.css';
+import { FaBars } from 'react-icons/fa';
 
 const OfficerManageAnnouncementsPage = () => {
   const [officer, setOfficer] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   const token = localStorage.getItem('officerAccessToken');
 
   useEffect(() => {
-    const storedOfficer = localStorage.getItem('officerInfo');
-    if (storedOfficer) {
-      setOfficer(JSON.parse(storedOfficer));
-    }
-  }, []);
-
-  useEffect(() => {
-    async function fetchAllAnnouncements() {
+    async function fetchData() {
       try {
-        setLoading(true);
-        const data = await getOfficerAnnouncements(token);
-        setAnnouncements(data);
-        setLoading(false);
+        const storedOfficer = localStorage.getItem('officerInfo');
+        const officerData = storedOfficer ? JSON.parse(storedOfficer) : null;
+        setOfficer(officerData);
+
+        if (token) {
+          const announcementsData = await getOfficerAnnouncements(token);
+          setAnnouncements(announcementsData);
+        }
       } catch (error) {
-        console.error("Failed to fetch announcements:", error);
-        setLoading(false);
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setIsLoading(false);
       }
     }
-    if (token) {
-      fetchAllAnnouncements();
-    }
+
+    fetchData();
   }, [token]);
 
   const handleAddNewAnnouncement = () => {
@@ -53,17 +53,18 @@ const OfficerManageAnnouncementsPage = () => {
 
   const handleDelete = async (announcementId) => {
     if (!announcementId) {
-      alert("Invalid announcement ID");
+      alert("Invalid announcement id");
       return;
     }
-    if (!window.confirm("Are you sure you want to permanently delete this announcement?")) return;
+    if (!window.confirm("Are you sure you want to archive this announcement?")) return;
+
     try {
-      await deleteOfficerAnnouncement(announcementId, token, true);
+      await deleteOfficerAnnouncement(announcementId, token);
       const updated = await getOfficerAnnouncements(token);
       setAnnouncements(updated);
     } catch (error) {
-      console.error("Failed to delete announcement:", error);
-      alert("Error deleting announcement");
+      console.error("Failed to archive announcement:", error);
+      alert("Error archiving announcement");
     }
   };
 
@@ -89,54 +90,43 @@ const OfficerManageAnnouncementsPage = () => {
     }
   };
 
-  const formatAnnouncementDate = (dateString) => {
-    const date = new Date(dateString);
-    return {
-      day: date.getDate(),
-      month: date.toLocaleDateString('en-US', { month: 'short' }),
-      formatted: date.toLocaleDateString(undefined, { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-    };
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
-  if (loading) {
-    return (
-      <OfficerLayout officer={officer}>
-        <div className="officer-manage-page loading">
-          <div className="loader"></div>
-          <p>Loading announcements...</p>
-        </div>
-      </OfficerLayout>
-    );
+  if (isLoading) {
+    return <div className="loading">Loading Announcement...</div>;
+  }
+
+  if (!officer) {
+    return <div className="error-message">Unable to load officer information. Please try again later.</div>;
   }
 
   return (
-    <OfficerLayout officer={officer}>
-      <div className="officer-manage-page">
-        <div className="officer-manage-header">
-          <h1>Manage Announcements</h1>
+    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <OfficerSidebar
+        officer={officer}
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+      />
+      <div className="main-content">
+        <div className="dashboard-header">
+          <div className="dashboard-left">
+            <button className="sidebar-toggle-inside" onClick={toggleSidebar}>
+              <FaBars />
+            </button>
+            <h1>Manage Announcements</h1>
+          </div>
           <button className="add-announcement-btn" onClick={handleAddNewAnnouncement}>
-            <i className="fas fa-plus"></i> ADD NEW ANNOUNCEMENT
+            ADD NEW ANNOUNCEMENT
           </button>
         </div>
 
-        <div className="announcements-grid">
+        <div className="announcements-section">
           {announcements.length > 0 ? (
-            announcements.map((announcement) => (
-              <div key={announcement.id} className="announcement-manage-card">
-                {/* Date badge */}
-                <div className="announcement-date-badge">
-                  <div className="announcement-month">{formatAnnouncementDate(announcement.date).month}</div>
-                  <div className="announcement-day">{formatAnnouncementDate(announcement.date).day}</div>
-                </div>
-
-                {/* Announcement image */}
-                <div className="announcement-image-wrapper">
+            <div className="announcements-grid">
+              {announcements.map((announcement) => (
+                <div key={announcement.id} className="announcement-card">
                   <img
                     src={
                       announcement.image_url
@@ -148,46 +138,24 @@ const OfficerManageAnnouncementsPage = () => {
                     alt={announcement.title}
                     className="announcement-image"
                   />
-                  <div className="image-overlay"></div>
-                </div>
-
-                {/* Announcement content */}
-                <div className="announcement-content">
-                  <h3 className="announcement-title">{announcement.title}</h3>
-
-                  <div className="announcement-info">
-                    <div className="announcement-info-item">
-                      <i className="fas fa-clock announcement-icon"></i>
-                      <span>{formatAnnouncementDate(announcement.date).formatted}</span>
-                    </div>
-                    <div className="announcement-info-item">
-                      <i className="fas fa-map-marker-alt announcement-icon"></i>
-                      <span>{announcement.location}</span>
-                    </div>
-                  </div>
-
-                  <p className="announcement-description">
-                    {announcement.description}
+                  <h3>{announcement.title}</h3>
+                  <p>{announcement.date ? new Date(announcement.date).toLocaleString() : ""}</p>
+                  <p>{announcement.location}</p>
+                  <p className="announcement-details">
+                    {announcement.description && announcement.description.length > 100
+                      ? `${announcement.description.slice(0, 100)}...`
+                      : announcement.description}
                   </p>
+                  <div className="card-actions">
+                    <button onClick={() => handleEdit(announcement)}>Edit</button>
+                    <button onClick={() => handleDelete(announcement.id)}>Archive</button>
+                  </div>
                 </div>
-
-                <div className="management-actions">
-                  <button className="btn-edit" onClick={() => handleEdit(announcement)}>
-                    <i className="fas fa-edit"></i> Edit
-                  </button>
-                  <button className="btn-delete" onClick={() => handleDelete(announcement.id)}>
-                    <i className="fas fa-trash"></i> Delete
-                  </button>
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           ) : (
             <div className="no-announcements-message">
-              <i className="fas fa-newspaper"></i>
-              <p>No announcements found.</p>
-              <button className="add-announcement-btn" onClick={handleAddNewAnnouncement}>
-                <i className="fas fa-plus"></i> Create Your First Announcement
-              </button>
+              No announcements found. Click "ADD NEW ANNOUNCEMENT" to create one.
             </div>
           )}
         </div>
@@ -199,7 +167,7 @@ const OfficerManageAnnouncementsPage = () => {
           initialAnnouncement={selectedAnnouncement}
         />
       </div>
-    </OfficerLayout>
+    </div>
   );
 };
 

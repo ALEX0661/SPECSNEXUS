@@ -4,23 +4,22 @@ import '../styles/ProfilePage.css';
 const ProfileCard = ({ user }) => {
   return (
     <div className="profile-card">
-      <div className="profile-info">
-        <div className="profile-row">
-          <div className="profile-label">Student Number:</div>
-          <div className="profile-value">{user.student_number}</div>
-        </div>
-        <div className="profile-row">
-          <div className="profile-label">Full Name:</div>
-          <div className="profile-value">{user.full_name}</div>
-        </div>
-        <div className="profile-row">
-          <div className="profile-label">Year and Block:</div>
-          <div className="profile-value">{user.year} {user.block}</div>
-        </div>
-        <div className="profile-row">
-          <div className="profile-label">Email Address (Domain):</div>
-          <div className="profile-value">{user.email}</div>
-        </div>
+      <h2>User Profile</h2>
+      <div className="profile-field">
+        <span className="label">Student Number:</span>
+        <span className="value">{user.student_number}</span>
+      </div>
+      <div className="profile-field">
+        <span className="label">Full Name:</span>
+        <span className="value">{user.full_name}</span>
+      </div>
+      <div className="profile-field">
+        <span className="label">Year and Block:</span>
+        <span className="value">{user.year} {user.block}</span>
+      </div>
+      <div className="profile-field">
+        <span className="label">Email Address (Domain):</span>
+        <span className="value">{user.email}</span>
       </div>
     </div>
   );

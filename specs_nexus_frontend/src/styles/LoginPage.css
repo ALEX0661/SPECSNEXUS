@@ -1,49 +1,149 @@
-/* src/styles/LoginPage.css */
-
-/* Import the desired fonts from Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Konkhmer+Sleokchher&display=swap');
 
-/* Basic reset */
-html, body {
+*{
+
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.login-page {
+  font-family: 'Dela Gothic One', sans-serif;
+  background-color: #253F21 ;
+  color: white;
   height: 100%;
 }
 
-/* Background styling for the login page */
-.login-page {
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 35px;
+  background-color: transparent;
+  gap: 1rem;
   position: relative;
-  min-height: 100vh;
-  background: url('../../public/images/background-image.png') center center no-repeat;
-  background-size: cover;
+  z-index: 2;
 }
 
-/* Header styles for the top-right login button */
-.header {
-  position: absolute;
-  top: 20px;
-  right: 20px;
+.header-content {
+  display: flex;
+  align-items: center;
 }
 
-/* Top-right Login Button */
+.header-logo {
+  width: 80px;
+  height: auto;
+}
+
+.header-title {
+  font-size: 2.2rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+}
+
+.specs {
+  font-size:40px;
+  color: #ffffff;
+  margin-right: 0.3rem;
+}
+
+.nexus {
+  color: #f47c3c;
+}
+
 .login-button {
-  background-color: #4B5320; /* Army green */
-  color: #fff;
+  background-color: #ffffff;
+  color: #4B5320;
   border: none;
-  padding: 8px 16px;
-  border-radius: 50px; /* Oval shape */
+  padding: 10px 20px;
+  border-radius: 50px;
   cursor: pointer;
   transition: background-color 0.3s;
-  font-size: 14px;
-  font-family: 'Konkhmer Sleokchher', sans-serif;
+  font-size: 16px;
+  font-family: 'Poppins', regular;
 }
 
 .login-button:hover {
   background-color: #3a4218;
+  color:#ffffff;
 }
 
-/* Modal Overlay */
+.container {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+  padding: 1rem 2rem;
+}
+
+.left-section {
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  letter-spacing: 5px;
+}
+
+.acronym {
+  list-style: none;
+  font-size: 3rem;
+  line-height: 4rem;
+  font-weight: bold;
+}
+
+.acronym li span {
+  color: #f47c3c;
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.seals {
+  margin-top: 7rem;
+}
+
+.seals img {
+  width: 65px;
+  margin-right: 10px;
+}
+
+.right-section {
+  position: absolute;
+    top: 0; /* Ensure it aligns with the top */
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  pointer-events: none;
+  overflow: hidden;
+  transform: scale(1.2);
+  padding-right: 5vw;
+}
+
+.seal-image {
+  width: 560px; /* Set a larger width */
+  height: 560px; /* Set a larger height */
+  object-fit: cover; /* Ensure the image scales properly */
+  border: 5px solid #ffffff; /* White border */
+  border-radius: 50%; /* Circular shape */
+  box-shadow: 4 4px 8px rgba(0, 0, 0, 0.5); /* Add a shadow for better visibility */
+  margin-right: 30px; /* Move the image slightly to the left */
+  margin-top: -60px; /* Remove any top margin */
+}
+
 .modal {
   position: fixed;
   top: 0;
@@ -57,7 +157,6 @@ html, body {
   z-index: 999;
 }
 
-/* Modal Content Container - taller and wider */
 .modal-content {
   background-color: #fff;
   border-radius: 25px;
@@ -68,8 +167,6 @@ html, body {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
   animation: slideDown 0.4s ease-out;
   font-family: 'Konkhmer Sleokchher', sans-serif;
-
-  /* NEW: Flex layout for centering content */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -77,7 +174,6 @@ html, body {
   text-align: center;
 }
 
-/* Slide-down animation */
 @keyframes slideDown {
   from {
     transform: translateY(-20px);
@@ -89,7 +185,6 @@ html, body {
   }
 }
 
-/* Welcome Title Styling */
 .welcome-title {
   font-family: 'Dela Gothic One', cursive;
   font-size: 2.5rem;
@@ -99,7 +194,6 @@ html, body {
   margin-top: -10px;
 }
 
-/* Close Button Styling */
 .close {
   position: absolute;
   top: 10px;
@@ -113,10 +207,9 @@ html, body {
   color: #000;
 }
 
-/* Input field styling with oval shape */
 .modal-content input {
   width: 100%;
-  padding: 10px 10px;
+  padding: 10px;
   margin-bottom: 20px;
   font-size: 1rem;
   border: 1px solid #ccc;
@@ -129,32 +222,101 @@ html, body {
   border-color: #4B5320;
 }
 
-/* Remove default button focus outline */
-button:focus {
-  outline: none;
-}
-
-/* Modal Login Button Styling - auto width */
-.modal-content button.modal-login-button {
-  width: 150px;
-  display: inline-block;
-  padding: 6px 20px; /* horizontal padding for a compact size */
-  font-size: 0.9rem;
-  border: none;
-  border-radius: 5px;
-  background-color: #4B5320; /* Green background */
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.modal-content button.modal-login-button:hover {
-  background-color: #3a4218;
-}
-
-/* Error Message Styling */
 .error {
   color: red;
   text-align: center;
   margin-bottom: 10px;
+}
+
+.modal-content button.modal-login-button {
+  width: 150px;
+  padding: 10px 20px;
+  font-size: 15px;
+  border: none;
+  border-radius: 30px;
+  background-color: #253F21; 
+  color: #fff; 
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); 
+}
+
+.modal-content button.modal-login-button:hover {
+  background-color: #253F21; 
+  color: #ffffff; 
+  transform: scale(1.05); 
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3); 
+}
+@media (max-width: 768px) {
+  .site-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 20px;
+  }
+
+  .header-title {
+    font-size: 1.6rem;
+    margin-top: 8px;
+  }
+
+  .login-button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 1rem;
+  }
+
+  .container {
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    height: auto;
+    overflow-y: auto;
+  }
+
+  .left-section {
+    width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+
+  .acronym {
+    font-size: 2rem;
+    line-height: 3rem;
+  }
+
+  .right-section {
+    display: none; /* hide decorative image on mobile */
+  }
+
+  .modal-content {
+    width: 90%;
+    padding: 25px 20px;
+  }
+
+  .welcome-title {
+    font-size: 1.8rem;
+  }
+
+  .modal-content input {
+    font-size: 0.9rem;
+  }
+
+  .modal-content button.modal-login-button {
+    width: 100%;
+    font-size: 1rem;
+  }
+
+  .seals {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+
+  .seals img {
+    margin: 5px;
+    width: 50px;
+  }
 }

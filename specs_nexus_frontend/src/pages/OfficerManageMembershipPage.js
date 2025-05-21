@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import OfficerLayout from '../components/OfficerLayout';
+import { useNavigate } from 'react-router-dom';
+import { FaBars } from 'react-icons/fa';
+import OfficerSidebar from '../components/OfficerSidebar';
 import {
   getOfficerMemberships,
   createOfficerMembership,
-  updateOfficerMembership,
   verifyOfficerMembership,
   getOfficerRequirements,
   updateOfficerRequirement,
   deleteOfficerRequirement,
-  uploadOfficerRequirementQRCode,
-  createOfficerRequirement,
-  getQRCode
+  uploadOfficerQRCode,
+  getQRCode,
+  createOfficerRequirement
 } from '../services/officerMembershipService';
 import OfficerMembershipModal from '../components/OfficerMembershipModal';
+import OfficerDenialReasonModal from '../components/OfficerDenialReasonModal';
 import '../styles/OfficerManageMembershipPage.css';
 
 const OfficerManageMembershipPage = () => {
@@ -24,69 +26,132 @@ const OfficerManageMembershipPage = () => {
   const [selectedRequirement, setSelectedRequirement] = useState(null);
   const [showQRManagementModal, setShowQRManagementModal] = useState(false);
   const [showAddRequirementModal, setShowAddRequirementModal] = useState(false);
+  const [showDenialReasonModal, setShowDenialReasonModal] = useState(false);
+  const [selectedMembershipId, setSelectedMembershipId] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
-  // Additional filters for memberships
   const [filterBlock, setFilterBlock] = useState('All');
   const [filterYear, setFilterYear] = useState('All');
   const [filterRequirement, setFilterRequirement] = useState('All');
   const [searchName, setSearchName] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const token = localStorage.getItem('officerAccessToken');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const storedOfficer = localStorage.getItem('officerInfo');
-    if (storedOfficer) {
-      setOfficer(JSON.parse(storedOfficer));
+    if (!token) {
+      navigate('/officer-login');
+      return;
     }
-  }, []);
+
+    async function fetchOfficerInfo() {
+      try {
+        const storedOfficer = localStorage.getItem('officerInfo');
+        if (storedOfficer) {
+          setOfficer(JSON.parse(storedOfficer));
+        } else {
+          navigate('/officer-login');
+        }
+      } catch (error) {
+        console.error("Failed to load officer info:", error);
+        navigate('/officer-login');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchOfficerInfo();
+  }, [token, navigate]);
 
   useEffect(() => {
+    if (!token || isLoading) return;
+
     async function fetchMemberships() {
       try {
         const data = await getOfficerMemberships(token);
         setMemberships(data);
       } catch (error) {
         console.error("Failed to fetch memberships:", error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('officerAccessToken');
+          localStorage.removeItem('officerInfo');
+          navigate('/officer-login');
+        }
       }
     }
     fetchMemberships();
-  }, [token]);
+  }, [token, isLoading, navigate]);
 
-  // Fetch grouped requirements (one record per unique requirement)
   useEffect(() => {
+    if (!token || isLoading) return;
+
     async function fetchRequirements() {
       try {
         const data = await getOfficerRequirements(token);
         setRequirements(data);
       } catch (error) {
         console.error("Failed to fetch requirements:", error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('officerAccessToken');
+          localStorage.removeItem('officerInfo');
+          navigate('/officer-login');
+        }
       }
     }
     fetchRequirements();
-  }, [token]);
+  }, [token, isLoading, navigate]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
 
-  // For verifying tab: Approve or Deny the payment.
   const handleVerifyAction = async (membershipId, action) => {
+    if (action === 'deny') {
+      setSelectedMembershipId(membershipId);
+      setShowDenialReasonModal(true);
+    } else {
+      try {
+        await verifyOfficerMembership(membershipId, action, null, token);
+        const updated = await getOfficerMemberships(token);
+        setMemberships(updated);
+        alert(`Membership ${action}d successfully!`);
+      } catch (error) {
+        console.error("Error updating membership verification:", error);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('officerAccessToken');
+          localStorage.removeItem('officerInfo');
+          navigate('/officer-login');
+        } else {
+          alert(`Error ${action}ing membership: ${error.response?.data?.detail || 'Unknown error'}`);
+        }
+      }
+    }
+  };
+
+  const handleDenialReasonSubmit = async (denialReason) => {
     try {
-      await verifyOfficerMembership(membershipId, action, token);
+      await verifyOfficerMembership(selectedMembershipId, 'deny', denialReason, token);
       const updated = await getOfficerMemberships(token);
       setMemberships(updated);
-      alert(`Membership ${action}d successfully!`);
+      alert("Membership denied successfully!");
+      setShowDenialReasonModal(false);
+      setSelectedMembershipId(null);
     } catch (error) {
-      console.error("Error updating membership verification:", error);
-      alert("Error updating membership verification");
+      console.error("Error denying membership:", error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        alert(`Error denying membership: ${error.response?.data?.detail || 'Unknown error'}`);
+      }
     }
   };
 
   const handleSave = async (formData, membershipId) => {
     try {
       if (membershipId) {
-        await updateOfficerMembership(membershipId, formData, token);
-        alert("Membership updated successfully!");
+        alert("Membership update not supported in this version.");
       } else {
         await createOfficerMembership(formData, token);
         alert("Membership created successfully!");
@@ -96,30 +161,33 @@ const OfficerManageMembershipPage = () => {
       setMemberships(updated);
     } catch (error) {
       console.error("Error saving membership:", error);
-      alert("Error saving membership");
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        alert(`Error saving membership: ${error.response?.data?.detail || 'Unknown error'}`);
+      }
     }
   };
 
-  // Handle requirement QR code upload (for the grouped requirement)
-  const handleRequirementQRUpload = async (file, paymentType) => {
-    if (!selectedRequirement || !selectedRequirement.requirement) {
-      console.error("No valid requirement selected for QR upload");
-      return;
-    }
+  const handleQRUpload = async (paymentType, file) => {
     try {
-      await uploadOfficerRequirementQRCode(selectedRequirement.requirement, paymentType, file, token);
-      alert("Requirement QR Code uploaded successfully!");
-      const updated = await getOfficerRequirements(token);
-      setRequirements(updated);
-      setSelectedRequirement(null);
+      await uploadOfficerQRCode(paymentType, file, token);
+      alert("QR Code uploaded successfully!");
       setShowQRManagementModal(false);
     } catch (error) {
-      console.error("Failed to upload requirement QR code:", error);
-      alert("Error uploading requirement QR code");
+      console.error("Failed to upload QR code:", error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        alert(`Error uploading QR code: ${error.response?.data?.detail || 'Unknown error'}`);
+      }
     }
   };
 
-  // Handle requirement update (only update the amount)
   const handleRequirementUpdate = async (amount) => {
     if (!selectedRequirement || !selectedRequirement.requirement) return;
     try {
@@ -131,11 +199,16 @@ const OfficerManageMembershipPage = () => {
       setSelectedRequirement(null);
     } catch (error) {
       console.error("Error updating requirement:", error);
-      alert("Error updating requirement");
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        alert(`Error updating requirement: ${error.response?.data?.detail || 'Unknown error'}`);
+      }
     }
   };
 
-  // Handle requirement archive (delete)
   const handleRequirementArchive = async (requirement) => {
     if (!window.confirm("Are you sure you want to archive this requirement?")) return;
     try {
@@ -145,18 +218,20 @@ const OfficerManageMembershipPage = () => {
       setRequirements(updated);
     } catch (error) {
       console.error("Error archiving requirement:", error);
-      alert("Error archiving requirement");
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        alert(`Error archiving requirement: ${error.response?.data?.detail || 'Unknown error'}`);
+      }
     }
   };
 
-  // Open the receipt image in a new tab (if needed)
   const openReceiptImage = (url) => {
-    const normalizedUrl = url.startsWith("/") ? url : `/${url}`;
-    const finalUrl = normalizedUrl.replace(/^\/app\/static/, '/static');
-    window.open(`http://localhost:8000${finalUrl}`, '_blank');
+    window.open(url, '_blank');
   };
 
-  // Filtering logic for the individual memberships table.
   const filteredMemberships = memberships.filter((m) => {
     let statusMatch = true;
     if (activeTab === 'all') {
@@ -173,26 +248,43 @@ const OfficerManageMembershipPage = () => {
     return statusMatch && blockMatch && yearMatch && reqMatch && nameMatch;
   });
 
-  if (!officer) {
+  if (isLoading) {
     return <div>Loading Officer Info...</div>;
   }
 
+  if (!officer) {
+    return null; // Redirect handled in useEffect
+  }
+
   return (
-    <OfficerLayout officer={officer}>
+    <div className="officer-manage-membership-layout">
+      <OfficerSidebar 
+        officer={officer} 
+        isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
+        className="officer-membership-sidebar"
+      />
       <div className="officer-manage-membership-page">
-        <h1>Manage Membership</h1>
-        
-        {/* Tabs */}
-        <div className="membership-tabs">
-          <button className={activeTab === 'all' ? 'active' : ''} onClick={() => handleTabChange('all')}>
-            Members
-          </button>
-          <button className={activeTab === 'verifying' ? 'active' : ''} onClick={() => handleTabChange('verifying')}>
-            Verifying
-          </button>
+        <div className="dashboard-header">
+          <div className="dashboard-left">
+            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              <FaBars />
+            </button>
+            <h1 className="dashboard-title">Manage Membership</h1>
+          </div>
         </div>
-        
-        {/* Additional Filters */}
+              
+        <div className="events-grid">
+          <div className="membership-tabs">
+            <button className={activeTab === 'all' ? 'active' : ''} onClick={() => handleTabChange('all')}>
+              Members
+            </button>
+            <button className={activeTab === 'verifying' ? 'active' : ''} onClick={() => handleTabChange('verifying')}>
+              Verifying
+            </button>
+          </div>
+        </div>
+
         <div className="additional-filters">
           <div className="filter-item">
             <label>Block:</label>
@@ -231,8 +323,7 @@ const OfficerManageMembershipPage = () => {
             />
           </div>
         </div>
-        
-        {/* Existing Membership Table */}
+
         <table className="membership-table">
           <thead>
             <tr>
@@ -256,15 +347,12 @@ const OfficerManageMembershipPage = () => {
                   <td>
                     {m.receipt_path ? (
                       <img
-                        src={
-                          m.receipt_path.startsWith("http")
-                            ? m.receipt_path
-                            : `http://localhost:8000${m.receipt_path}`
-                        }
+                        src={m.receipt_path}
                         alt="Receipt"
                         width="50"
                         style={{ cursor: 'pointer' }}
                         onClick={() => openReceiptImage(m.receipt_path)}
+                        onError={() => console.error(`Failed to load receipt image: ${m.receipt_path}`)}
                       />
                     ) : (
                       '-'
@@ -282,8 +370,7 @@ const OfficerManageMembershipPage = () => {
             ))}
           </tbody>
         </table>
-        
-        {/* Membership Requirements Section */}
+
         <div className="requirement-section">
           <h2>Membership Requirements</h2>
           <table className="membership-table">
@@ -319,16 +406,10 @@ const OfficerManageMembershipPage = () => {
               ))}
             </tbody>
           </table>
-          {/* Buttons for QR Code management and adding requirements */}
           <div className="requirement-management">
             <button
               className="manage-qr-code-btn"
-              onClick={() => {
-                if (!selectedRequirement && requirements.length > 0) {
-                  setSelectedRequirement(requirements[0]);
-                }
-                setShowQRManagementModal(true);
-              }}
+              onClick={() => setShowQRManagementModal(true)}
             >
               Manage QR Code
             </button>
@@ -340,15 +421,13 @@ const OfficerManageMembershipPage = () => {
             </button>
           </div>
         </div>
-        
-        {/* Officer Membership Modal */}
+
         <OfficerMembershipModal
           show={showModal}
           onClose={() => setShowModal(false)}
           onSave={handleSave}
         />
-        
-        {/* Modal for Editing Requirement Price */}
+
         {showRequirementModal && selectedRequirement && (
           <OfficerRequirementModal
             show={showRequirementModal}
@@ -358,19 +437,14 @@ const OfficerManageMembershipPage = () => {
           />
         )}
 
-        {/* Modal for Managing QR Code */}
         {showQRManagementModal && (
           <OfficerQRManagementModal
             show={showQRManagementModal}
             onClose={() => setShowQRManagementModal(false)}
-            onQRUpload={(file, type, req) => {
-              setSelectedRequirement(req);
-              handleRequirementQRUpload(file, type);
-            }}
+            onQRUpload={handleQRUpload}
           />
         )}
 
-        {/* Modal for Adding a Requirement */}
         {showAddRequirementModal && (
           <OfficerAddRequirementModal
             show={showAddRequirementModal}
@@ -384,17 +458,30 @@ const OfficerManageMembershipPage = () => {
                 setShowAddRequirementModal(false);
               } catch (error) {
                 console.error("Error adding requirement:", error);
-                alert("Error adding requirement");
+                if (error.response?.status === 401) {
+                  localStorage.removeItem('officerAccessToken');
+                  localStorage.removeItem('officerInfo');
+                  navigate('/officer-login');
+                } else {
+                  alert(`Error adding requirement: ${error.response?.data?.detail || 'Unknown error'}`);
+                }
               }
             }}
           />
         )}
+
+        {showDenialReasonModal && (
+          <OfficerDenialReasonModal
+            show={showDenialReasonModal}
+            onClose={() => { setShowDenialReasonModal(false); setSelectedMembershipId(null); }}
+            onSubmit={handleDenialReasonSubmit}
+          />
+        )}
       </div>
-    </OfficerLayout>
+    </div>
   );
 };
 
-// Modal for Editing Requirement Price (only editing amount)
 const OfficerRequirementModal = ({ show, requirementData, onClose, onSave }) => {
   const [amount, setAmount] = useState(requirementData.amount || '');
 
@@ -426,45 +513,67 @@ const OfficerRequirementModal = ({ show, requirementData, onClose, onSave }) => 
   );
 };
 
-// Modal for Managing QR Code – now using logic similar to MembershipModal.js
 const OfficerQRManagementModal = ({ show, onClose, onQRUpload }) => {
   const token = localStorage.getItem('officerAccessToken');
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedType, setSelectedType] = useState("paymaya");
-  const [QRPreviewUrl, setQRPreviewUrl] = useState(null);
+  const [qrPreviewUrl, setQrPreviewUrl] = useState(null);
+  const [qrError, setQrError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchQRCodeData = async () => {
+    setIsLoading(true);
+    setQrError(null);
+    try {
+      const data = await getQRCode(selectedType, token);
+      if (data && data.qr_code_url) {
+        setQrPreviewUrl(data.qr_code_url);
+      } else {
+        setQrPreviewUrl(null);
+        setQrError(`No QR code available for ${selectedType}.`);
+      }
+    } catch (error) {
+      console.error("Failed to fetch QR code:", error);
+      setQrPreviewUrl(null);
+      setQrError(error.response?.data?.detail || `Failed to load QR code for ${selectedType}. Please try again.`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchQRCodeData() {
-      try {
-        const data = await getQRCode(selectedType, token);
-        if (data && data.qr_code_url) {
-          let url = data.qr_code_url.trim();
-          if (!url.startsWith("http")) {
-            if (!url.startsWith("/")) {
-              url = "/" + url;
-            }
-            url = `http://localhost:8000${url}`;
-          }
-          setQRPreviewUrl(url);
-        } else {
-          setQRPreviewUrl(null);
-        }
-      } catch (error) {
-        console.error("Failed to fetch QR code:", error);
-        setQRPreviewUrl(null);
-      }
-    }
+    if (!token || !show) return;
     fetchQRCodeData();
-  }, [selectedType, token]);
+  }, [selectedType, token, show]);
 
   const handleFileChange = (e) => {
-    setSelectedFile(e.target.files[0]);
+    const file = e.target.files[0];
+    if (file && !file.type.startsWith('image/')) {
+      setQrError("Please select an image file.");
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(file);
+    setQrError(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (selectedFile) {
-      await onQRUpload(selectedFile, selectedType);
+    if (!selectedFile) {
+      setQrError("No file selected.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await onQRUpload(selectedType, selectedFile);
+      setSelectedFile(null);
+      setQrError(null);
+      // Refresh QR code preview
+      await fetchQRCodeData();
+    } catch (error) {
+      setQrError(`Failed to upload QR code: ${error.response?.data?.detail || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -476,8 +585,16 @@ const OfficerQRManagementModal = ({ show, onClose, onQRUpload }) => {
         <button className="modal-close" onClick={onClose}>×</button>
         <h2>Manage QR Code</h2>
         <div className="qr-code-preview">
-          {QRPreviewUrl ? (
-            <img src={QRPreviewUrl} alt="QR Code Preview" />
+          {isLoading ? (
+            <p>Loading QR code...</p>
+          ) : qrError ? (
+            <p className="qr-error">{qrError}</p>
+          ) : qrPreviewUrl ? (
+            <img 
+              src={qrPreviewUrl} 
+              alt="QR Code Preview" 
+              onError={() => setQrError("Failed to load QR code image. The image may be inaccessible.")} 
+            />
           ) : (
             <p>No QR Code Uploaded</p>
           )}
@@ -490,15 +607,21 @@ const OfficerQRManagementModal = ({ show, onClose, onQRUpload }) => {
           </select>
         </div>
         <form onSubmit={handleSubmit}>
-          <input type="file" accept="image/*" onChange={handleFileChange} required />
-          <button type="submit">Upload New QR Code</button>
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={handleFileChange} 
+            disabled={isLoading}
+          />
+          <button type="submit" disabled={!selectedFile || isLoading}>
+            {isLoading ? 'Uploading...' : 'Upload New QR Code'}
+          </button>
         </form>
       </div>
     </div>
   );
 };
 
-// Modal for Adding a New Requirement
 const OfficerAddRequirementModal = ({ show, onClose, onSave }) => {
   const [requirement, setRequirement] = useState("1st Semester Membership");
   const [amount, setAmount] = useState("");
@@ -526,7 +649,12 @@ const OfficerAddRequirementModal = ({ show, onClose, onSave }) => {
           </div>
           <div className="form-field">
             <label>Amount:</label>
-            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+            <input 
+              type="number" 
+              value={amount} 
+              onChange={(e) => setAmount(e.target.value)} 
+              required 
+            />
           </div>
           <button type="submit">Add Requirement</button>
         </form>

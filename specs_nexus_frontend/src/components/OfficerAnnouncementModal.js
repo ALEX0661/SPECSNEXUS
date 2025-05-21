@@ -27,6 +27,7 @@ const OfficerAnnouncementModal = ({ show, onClose, onSave, initialAnnouncement }
     }
   }, [initialAnnouncement, show]);
 
+  // Create a preview URL when an image file is selected, and clean it up when changed.
   useEffect(() => {
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);

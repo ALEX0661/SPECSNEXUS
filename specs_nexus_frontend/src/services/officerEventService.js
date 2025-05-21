@@ -11,20 +11,14 @@ export async function getOfficerEvents(token) {
 
 export async function createOfficerEvent(formData, token) {
   const response = await axios.post(`${API_URL}/events/officer/create`, formData, {
-    headers: { 
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data'
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
   return response.data;
 }
 
 export async function updateOfficerEvent(eventId, formData, token) {
   const response = await axios.put(`${API_URL}/events/officer/update/${eventId}`, formData, {
-    headers: { 
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'multipart/form-data'
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
   return response.data;
 }

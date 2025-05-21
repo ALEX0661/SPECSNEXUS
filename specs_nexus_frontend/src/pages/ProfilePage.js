@@ -1,58 +1,68 @@
 import React, { useEffect, useState } from 'react';
+import Sidebar from '../components/Sidebar';
 import { getProfile } from '../services/userService';
 import ProfileCard from '../components/ProfileCard';
-import Layout from '../components/Layout';
+import { FaBars } from 'react-icons/fa';
 import '../styles/ProfilePage.css';
 
 const ProfilePage = () => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // default: open
   const token = localStorage.getItem('accessToken');
 
   useEffect(() => {
     async function fetchProfile() {
       try {
-        setLoading(true);
         const userData = await getProfile(token);
         setUser(userData);
-        setLoading(false);
       } catch (error) {
         console.error('Failed to fetch user profile:', error);
-        setError('Failed to load profile data. Please try again later.');
-        setLoading(false);
+      } finally {
+        setIsLoading(false);
       }
     }
-    
     fetchProfile();
   }, [token]);
 
-  if (loading) {
-    return (
-      <Layout user={{ full_name: 'Loading...', student_number: '...' }}>
-        <div className="profile-page">
-          <div className="loading-spinner">Loading profile data...</div>
-        </div>
-      </Layout>
-    );
+  const today = new Date();
+  const formattedDate = today.toLocaleString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  // Show full-screen loading state if initial user data is loading
+  if (isLoading) {
+    return <div className="loading">Loading Profile...</div>;
   }
 
-  if (error) {
-    return (
-      <Layout user={{ full_name: 'Error', student_number: '...' }}>
-        <div className="profile-page">
-          <div className="error-message">{error}</div>
-        </div>
-      </Layout>
-    );
+  if (!user) {
+    return <div className="error-message">Unable to load profile data. Please try again later.</div>;
   }
 
   return (
-    <Layout user={user}>
-      <div className="profile-page">
-        <ProfileCard user={user} />
+    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <Sidebar user={user} isOpen={isSidebarOpen} />
+      <div className="main-content">
+        <div className="dashboard-header">
+          <div className="dashboard-left">
+            <button className="sidebar-toggle-inside" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              <FaBars />
+            </button>
+            <h1 className="dashboard-title">My Profile</h1>
+          </div>
+          <span className="current-date">{formattedDate}</span>
+        </div>
+
+        <div className="profile-section">
+          <ProfileCard user={user} />
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 };
 
