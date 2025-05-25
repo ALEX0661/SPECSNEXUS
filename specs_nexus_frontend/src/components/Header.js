@@ -12,6 +12,11 @@ const Header = ({ toggleSidebar, isSidebarOpen, isMobile }) => {
     const path = location.pathname;
     // Remove the slash and capitalize the first letter
     if (path === '/') return 'Home';
+    if (path === 'officer-dashboard') return 'Dashboard';
+    if (path === '/officer-manage-events') return 'Manage Events';
+    if (path === '/officer-manage-announcements') return 'Manage Announcements';
+    if (path === '/officer-manage-membership') return 'Manage Membership';
+    if (path === '/officer-manage-officers') return 'Manage Officers';
     if (path === '/dashboard') return 'Dashboard';
     return path.substring(1).split('-').map(word => 
       word.charAt(0).toUpperCase() + word.substring(1)

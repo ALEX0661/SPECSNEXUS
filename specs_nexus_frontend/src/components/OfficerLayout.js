@@ -1,40 +1,40 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import OfficerSidebar from './OfficerSidebar';
 import Header from './Header';
+import LogoutModal from './LogoutModal';
 import '../styles/OfficerLayout.css';
 
 const OfficerLayout = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [officer, setOfficer] = useState({});
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    const savedState = localStorage.getItem('sidebarOpen');
+    if (savedState !== null) {
+      return JSON.parse(savedState);
+    }
+    return window.innerWidth > 768;
+  });
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
-  // Handle window resize to determine if we're on mobile
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      
-      // Auto collapse sidebar on mobile, expand on desktop
-      if (mobile) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
     };
 
-    // Initial check
     handleResize();
-    
-    // Add event listener
     window.addEventListener('resize', handleResize);
-    
-    // Clean up
     return () => {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
 
-  // Load officer data from local storage
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', JSON.stringify(isSidebarOpen));
+  }, [isSidebarOpen]);
+
   useEffect(() => {
     const officerInfo = JSON.parse(localStorage.getItem('officerInfo'));
     if (officerInfo) setOfficer(officerInfo);
@@ -44,9 +44,29 @@ const OfficerLayout = ({ children }) => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
-  // Calculate content margin based on sidebar state and device
+  const handleSidebarOverlayClick = () => {
+    if (isMobile && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const handleOpenLogoutModal = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const handleCloseLogoutModal = () => {
+    setIsLogoutModalOpen(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('officerAccessToken');
+    localStorage.removeItem('officerInfo');
+    navigate('/officer-login');
+    handleCloseLogoutModal();
+  };
+
   const contentStyle = isMobile 
-    ? { marginLeft: 0 } // No margin on mobile, sidebar will overlay
+    ? { marginLeft: 0 }
     : { marginLeft: isSidebarOpen ? '220px' : '60px' };
 
   return (
@@ -55,8 +75,16 @@ const OfficerLayout = ({ children }) => {
         officer={officer} 
         isSidebarOpen={isSidebarOpen} 
         setIsSidebarOpen={setIsSidebarOpen}
-        isMobile={isMobile} 
+        isMobile={isMobile}
+        onOpenLogoutModal={handleOpenLogoutModal}
       />
+      {isMobile && isSidebarOpen && (
+        <div
+          className="sidebar-overlay-ss"
+          onClick={handleSidebarOverlayClick}
+          aria-hidden="true"
+        />
+      )}
       <div className="main-content" style={contentStyle}>
         <Header 
           toggleSidebar={toggleSidebar} 
@@ -67,6 +95,11 @@ const OfficerLayout = ({ children }) => {
           {children}
         </div>
       </div>
+      <LogoutModal 
+        isOpen={isLogoutModalOpen}
+        onClose={handleCloseLogoutModal}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 };

@@ -12,25 +12,96 @@ import OfficerManageEventsPage from './pages/OfficerManageEventsPage';
 import OfficerManageAnnouncementsPage from './pages/OfficerManageAnnouncementsPage';
 import OfficerManageMembershipPage from './pages/OfficerManageMembershipPage';
 import AdminManageOfficerPage from './pages/AdminManageOfficerPage';
-import Chatbot from './components/Chatbot'; 
-
+import UserAuthGuard from './components/UserAuthGuard';
+import OfficerAuthGuard from './components/OfficerAuthGuard';
+import Chatbot from './components/Chatbot';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<LoginPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/announcements" element={<AnnouncementsPage />} />
-        <Route path="/membership" element={<MembershipPage />} />
         <Route path="/officer-login" element={<OfficerLoginPage />} />
-        <Route path="/officer-dashboard" element={<OfficerDashboardPage />} />
-        <Route path="/officer-manage-events" element={<OfficerManageEventsPage />} />
-        <Route path="/officer-manage-announcements" element={<OfficerManageAnnouncementsPage />} />
-        <Route path="/officer-manage-membership" element={<OfficerManageMembershipPage />} />
-        <Route path="/admin-manage-officers" element={<AdminManageOfficerPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <UserAuthGuard>
+              <DashboardPage />
+            </UserAuthGuard>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <UserAuthGuard>
+              <ProfilePage />
+            </UserAuthGuard>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <UserAuthGuard>
+              <EventsPage />
+            </UserAuthGuard>
+          }
+        />
+        <Route
+          path="/announcements"
+          element={
+            <UserAuthGuard>
+              <AnnouncementsPage />
+            </UserAuthGuard>
+          }
+        />
+        <Route
+          path="/membership"
+          element={
+            <UserAuthGuard>
+              <MembershipPage />
+            </UserAuthGuard>
+          }
+        />
+        <Route
+          path="/officer-dashboard"
+          element={
+            <OfficerAuthGuard>
+              <OfficerDashboardPage />
+            </OfficerAuthGuard>
+          }
+        />
+        <Route
+          path="/officer-manage-events"
+          element={
+            <OfficerAuthGuard>
+              <OfficerManageEventsPage />
+            </OfficerAuthGuard>
+          }
+        />
+        <Route
+          path="/officer-manage-announcements"
+          element={
+            <OfficerAuthGuard>
+              <OfficerManageAnnouncementsPage />
+            </OfficerAuthGuard>
+          }
+        />
+        <Route
+          path="/officer-manage-membership"
+          element={
+            <OfficerAuthGuard>
+              <OfficerManageMembershipPage />
+            </OfficerAuthGuard>
+          }
+        />
+        <Route
+          path="/admin-manage-officers"
+          element={
+            <OfficerAuthGuard>
+              <AdminManageOfficerPage />
+            </OfficerAuthGuard>
+          }
+        />
       </Routes>
       <Chatbot />
     </Router>

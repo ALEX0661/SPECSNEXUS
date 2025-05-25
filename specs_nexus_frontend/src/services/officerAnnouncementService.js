@@ -1,31 +1,76 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const backendBaseUrl = "https://specs-nexus-production.up.railway.app";
 
-export async function getOfficerAnnouncements(token) {
-  const response = await axios.get(`${API_URL}/announcements`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+export const getOfficerAnnouncements = async (token, showArchived = false) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/announcements/officer/list?archived=${showArchived}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching announcements:", error);
+    throw error;
+  }
+};
 
-export async function createOfficerAnnouncement(formData, token) {
-  const response = await axios.post(`${API_URL}/announcements/officer/create`, formData, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+export const createOfficerAnnouncement = async (formData, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/announcements/officer/create`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error creating announcement:", error);
+    throw error;
+  }
+};
 
-export async function updateOfficerAnnouncement(announcementId, formData, token) {
-  const response = await axios.put(`${API_URL}/announcements/officer/update/${announcementId}`, formData, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+export const updateOfficerAnnouncement = async (announcementId, formData, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/announcements/officer/update/${announcementId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error updating announcement:", error);
+    throw error;
+  }
+};
 
-export async function deleteOfficerAnnouncement(announcementId, token) {
-  const response = await axios.delete(`${API_URL}/announcements/officer/delete/${announcementId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+export const deleteOfficerAnnouncement = async (announcementId, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/announcements/officer/delete/${announcementId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error archiving announcement:", error);
+    throw error;
+  }
+};

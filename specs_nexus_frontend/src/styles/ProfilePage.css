@@ -58,8 +58,85 @@
   color: #444;
 }
 
+/* Form styling */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Input and select styling */
+.profile-input,
+.profile-select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.3s ease;
+}
+
+.profile-input:focus,
+.profile-select:focus {
+  border-color: #28a745;
+  outline: none;
+}
+
+/* Button styling */
+.btn-edit,
+.btn-save,
+.btn-cancel {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn-edit {
+  background-color: #28a745;
+  color: #fff;
+  border: none;
+  margin-top: 1rem;
+  align-self: center;
+}
+
+.btn-edit:hover {
+  background-color: #218838;
+}
+
+.btn-save {
+  background-color: #28a745;
+  color: #fff;
+  border: none;
+}
+
+.btn-save:hover {
+  background-color: #218838;
+}
+
+.btn-cancel {
+  background-color: #dc3545;
+  color: #fff;
+  border: none;
+}
+
+.btn-cancel:hover {
+  background-color: #c82333;
+}
+
+/* Form actions container */
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
 /* Loading and error message styling */
-.loading, .error-message {
+.loading,
+.error-message {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -78,6 +155,13 @@
 
   .profile-field .label {
     margin-bottom: 0;
+    width: 30%;
+  }
+
+  .profile-field .value,
+  .profile-input,
+  .profile-select {
+    width: 65%;
   }
 }
 
@@ -99,6 +183,13 @@
   .profile-field {
     font-size: 0.9rem;
   }
+
+  .btn-edit,
+  .btn-save,
+  .btn-cancel {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
 }
 
 /* Small mobile devices */
@@ -118,5 +209,17 @@
 
   .profile-field {
     font-size: 0.85rem;
+  }
+
+  .btn-edit,
+  .btn-save,
+  .btn-cancel {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }

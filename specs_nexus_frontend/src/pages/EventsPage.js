@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { getProfile } from '../services/userService';
 import { getEvents, joinEvent, leaveEvent } from '../services/eventService';
 import EventCard from '../components/EventCard';
 import EventModal from '../components/EventModal';
+import StatusModal from '../components/StatusModal';
 import Layout from '../components/Layout';
+import Loading from '../components/Loading';
 import '../styles/EventsPage.css';
 
-const backendBaseUrl = "http://localhost:8000";
+const backendBaseUrl = "https://specs-nexus-production.up.railway.app";
 
 const EventsPage = () => {
   const [user, setUser] = useState(null);
@@ -14,8 +17,15 @@ const EventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEventsLoading, setIsEventsLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // Filter for all, upcoming, registered
+  const [filter, setFilter] = useState('all');
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success'
+  });
   const token = localStorage.getItem('accessToken');
+  const navigate = useNavigate(); // Initialize navigate
 
   useEffect(() => {
     async function fetchProfile() {
@@ -37,8 +47,6 @@ const EventsPage = () => {
       try {
         const eventsData = await getEvents(token);
         setEvents(eventsData);
-
-        // If we have a selected event, update it with the latest data
         if (selectedEvent) {
           const updatedEvent = eventsData.find(e => e.id === selectedEvent.id);
           if (updatedEvent) {
@@ -65,12 +73,16 @@ const EventsPage = () => {
       setSelectedEvent({ ...event, participants });
     } catch (error) {
       console.error('Failed to fetch participants:', error);
-      setSelectedEvent(event); // fallback without participants
+      setSelectedEvent(event);
     }
   };
 
   const closeModal = () => {
     setSelectedEvent(null);
+  };
+
+  const closeStatusModal = () => {
+    setStatusModal({ isOpen: false, title: '', message: '', type: 'success' });
   };
 
   const handleParticipate = async (eventId) => {
@@ -79,8 +91,20 @@ const EventsPage = () => {
       const updatedEvents = await getEvents(token);
       setEvents(updatedEvents);
       closeModal();
+      setStatusModal({
+        isOpen: true,
+        title: 'Registration Successful',
+        message: 'You have successfully registered for the event!',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Failed to join event:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Registration Failed',
+        message: 'There was an error registering for the event. Please try again.',
+        type: 'error'
+      });
     }
   };
 
@@ -90,12 +114,23 @@ const EventsPage = () => {
       const updatedEvents = await getEvents(token);
       setEvents(updatedEvents);
       closeModal();
+      setStatusModal({
+        isOpen: true,
+        title: 'Cancellation Successful',
+        message: 'You have successfully cancelled your registration for the event!',
+        type: 'success'
+      });
     } catch (error) {
       console.error('Failed to leave event:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Cancellation Failed',
+        message: 'There was an error cancelling your registration. Please try again.',
+        type: 'error'
+      });
     }
   };
 
-  // Event filtering logic
   const filterEvents = () => {
     if (filter === 'all') {
       return events;
@@ -110,18 +145,13 @@ const EventsPage = () => {
 
   const filteredEvents = filterEvents();
 
-  // Show full-screen loading state if initial user data is loading
   if (isLoading) {
-    return (
-      <div className="loading">
-        <div className="loader"></div>
-        <p>Loading Events...</p>
-      </div>
-    );
+    return <Loading message="Loading Events..." />;
   }
 
   if (!user) {
-    return <div className="error-message">Unable to load user data. Please try again later.</div>;
+    navigate('/'); // Redirect to login page
+    return null; // Prevent rendering anything else
   }
 
   return (
@@ -153,9 +183,7 @@ const EventsPage = () => {
 
         <div className="events-section">
           {isEventsLoading ? (
-            <div className="events-loading">
-              <div className="loading-indicator">Loading events data...</div>
-            </div>
+            <Loading message="Loading Events.." />
           ) : filteredEvents.length > 0 ? (
             <div className="events-grid">
               {filteredEvents.map((event) => (
@@ -173,9 +201,17 @@ const EventsPage = () => {
             onClose={closeModal}
             onParticipate={handleParticipate}
             onNotParticipate={handleNotParticipate}
-            currentUserId={user.id}
+            show={!!selectedEvent}
           />
         )}
+
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={closeStatusModal}
+          title={statusModal.title}
+          message={statusModal.message}
+          type={statusModal.type}
+        />
       </div>
     </Layout>
   );

@@ -1,36 +1,88 @@
-import axios from 'axios';
+const backendBaseUrl = "https://specs-nexus-production.up.railway.app";
 
-const API_URL = 'http://localhost:8000';
+export const getOfficerEvents = async (token, archived = false) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/events/officer/list?archived=${archived}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-export async function getOfficerEvents(token) {
-  const response = await axios.get(`${API_URL}/events/officer/list`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-export async function createOfficerEvent(formData, token) {
-  const response = await axios.post(`${API_URL}/events/officer/create`, formData, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching officer events:', error);
+    throw error;
+  }
+};
 
-export async function updateOfficerEvent(eventId, formData, token) {
-  const response = await axios.put(`${API_URL}/events/officer/update/${eventId}`, formData, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+export const createOfficerEvent = async (formData, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/events/officer/create`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
 
-export async function deleteOfficerEvent(eventId, token) {
-  const response = await axios.delete(`${API_URL}/events/officer/delete/${eventId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
-}
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-export async function getEventParticipants(eventId) {
-  const response = await axios.get(`${API_URL}/events/${eventId}/participants`);
-  return response.data;
-}
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error creating event:', error);
+    throw error;
+  }
+};
+
+export const updateOfficerEvent = async (eventId, formData, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/events/officer/update/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error updating event:', error);
+    throw error;
+  }
+};
+
+export const deleteOfficerEvent = async (eventId, token) => {
+  try {
+    const response = await fetch(`${backendBaseUrl}/events/officer/delete/${eventId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    throw error;
+  }
+};

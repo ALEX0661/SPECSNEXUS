@@ -92,17 +92,16 @@
   background-color: white;
 }
 
-.announcement-title {
-  font-size: 14.4px; /* Aligned with EventCard */
+.announcements-title {
+  font-size: 24px; /* Reduced from 16px */
   font-weight: 700;
-  margin: 0 0 9px 0; /* Aligned with EventCard */
+  margin: 0 0 9px 0; /* Reduced from 10px */
   color: #333;
   line-height: 1.3;
-  height: 37.8px; /* Aligned with EventCard */
+  height: 37.8px; /* Reduced from 42px */
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .announcement-info {

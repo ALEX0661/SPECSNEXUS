@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   FaUser, 
   FaHome, 
@@ -9,26 +9,10 @@ import {
   FaSignOutAlt,
   FaBars
 } from 'react-icons/fa';
-import LogoutModal from './LogoutModal';
 import '../styles/Sidebar.css';
 
-const Sidebar = ({ user, isOpen, isMobile, onToggle }) => {
+const Sidebar = ({ user, isOpen, isMobile, onToggle, onOpenLogoutModal }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-
-  const handleOpenLogoutModal = () => {
-    setIsLogoutModalOpen(true);
-  };
-
-  const handleCloseLogoutModal = () => {
-    setIsLogoutModalOpen(false);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    navigate('/');
-  };
 
   const sidebarClass = isOpen ? 'sidebar' : 'sidebar collapsed';
 
@@ -89,19 +73,10 @@ const Sidebar = ({ user, isOpen, isMobile, onToggle }) => {
         </ul>
       </nav>
       
-      <button className="logout-btn" onClick={handleOpenLogoutModal}>
+      <button className="logout-btn" onClick={onOpenLogoutModal}>
         <span className="nav-icon"><FaSignOutAlt /></span>
         {isOpen && <span className="nav-text">Logout</span>}
       </button>
-
-      <LogoutModal 
-        isOpen={isLogoutModalOpen}
-        onClose={handleCloseLogoutModal}
-        onConfirm={() => {
-          handleLogout();
-          handleCloseLogoutModal();
-        }}
-      />
     </div>
   );
 };

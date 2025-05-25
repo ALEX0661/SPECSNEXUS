@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { login } from '../services/authService';
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 
 const LoginForm = ({ onLoginSuccess }) => {
   const [emailOrStudentNumber, setEmailOrStudentNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,6 +34,10 @@ const LoginForm = ({ onLoginSuccess }) => {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
     <div className="login-form">
       {error && <p className="error">{error}</p>}
@@ -47,16 +53,19 @@ const LoginForm = ({ onLoginSuccess }) => {
             disabled={isLoading}
           />
         </div>
-        <div>
+        <div className="password-container">
           <input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             disabled={isLoading}
           />
+          <span className="password-toggle" onClick={togglePasswordVisibility}>
+            {showPassword ? <FiEyeOff /> : <FiEye />}
+          </span>
         </div>
         <button 
           type="submit" 

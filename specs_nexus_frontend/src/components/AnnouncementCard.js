@@ -1,7 +1,7 @@
 import React from 'react';
 import '../styles/AnnouncementCard.css';
 
-const backendBaseUrl = "http://localhost:8000";
+const backendBaseUrl = "https://specs-nexus-production.up.railway.app";
 
 const AnnouncementCard = ({ announcement, onClick }) => {
   const imageUrl =
@@ -56,7 +56,7 @@ const AnnouncementCard = ({ announcement, onClick }) => {
         
         {/* Announcement content */}
         <div className="announcement-content">
-          <h3 className="announcement-title">{truncateText(announcement.title, 40)}</h3>
+          <h3 className="announcements-title">{truncateText(announcement.title, 40)}</h3>
           
           <div className="announcement-info">
             {announcement.date && (

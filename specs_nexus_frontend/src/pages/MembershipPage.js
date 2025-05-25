@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { getProfile } from '../services/userService';
 import { getMemberships } from '../services/membershipService';
 import MembershipModal from '../components/MembershipModal';
 import Layout from '../components/Layout';
+import Loading from '../components/Loading';
 import '../styles/MembershipPage.css';
 
 const MembershipPage = () => {
@@ -12,6 +14,7 @@ const MembershipPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMemberships, setLoadingMemberships] = useState(true);
   const token = localStorage.getItem('accessToken');
+  const navigate = useNavigate(); // Initialize navigate
 
   useEffect(() => {
     async function fetchProfile() {
@@ -85,16 +88,12 @@ const MembershipPage = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="page-loading">
-        <div className="loader"></div>
-        <p>Loading Membership Information...</p>
-      </div>
-    );
+    return <Loading message="Loading Membership data..." />;
   }
 
   if (!user) {
-    return <div className="error-message">Unable to load user data. Please try again later.</div>;
+    navigate('/'); // Redirect to login page
+    return null; // Prevent rendering anything else
   }
 
   const notPaidOrDeniedMemberships = memberships.filter(
@@ -109,7 +108,6 @@ const MembershipPage = () => {
     (m) => m.payment_status?.trim().toLowerCase() === "paid"
   );
 
-  // Reusable component for membership card
   const MembershipCard = ({ membership }) => {
     const { progressPercentage, progressColor, displayStatus, statusClass } = getProgressData(
       membership.payment_status, 
@@ -136,11 +134,10 @@ const MembershipPage = () => {
         </div>
         <div className="membership-card-inner">
           <div className="card-header">
-            <div className="requirement-icon"></div>
             <h3 className="requirement-name">{membership.requirement || "N/A"}</h3>
           </div>
           
-          <div className="progress-container">
+          <div className="progress-containers">
             <div className="progress-label">
               <span>Progress</span>
               <span>{progressPercentage}%</span>
@@ -196,7 +193,6 @@ const MembershipPage = () => {
     );
   };
 
-  // Reusable section component
   const MembershipSection = ({ title, memberships, emptyMessage, iconClass }) => {
     return (
       <div className={`membership-section ${iconClass}`}>
@@ -206,9 +202,7 @@ const MembershipPage = () => {
         </div>
         
         {loadingMemberships ? (
-          <div className="membership-loading">
-            <div className="loading-indicator">Loading membership data...</div>
-          </div>
+          <Loading message="Loading Membership data..." />
         ) : memberships.length > 0 ? (
           <div className="memberships-grid">
             {memberships.map((membership) => (

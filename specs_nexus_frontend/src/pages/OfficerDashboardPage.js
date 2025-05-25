@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import OfficerSidebar from '../components/OfficerSidebar';
 import { getDashboardAnalytics } from '../services/analyticsService';
-import '../styles/OfficerDashboardPage.css';
+import { getUsers } from '../services/officerService';
+import OfficerLayout from '../components/OfficerLayout';
+import Loading from '../components/Loading';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell,
   ResponsiveContainer
 } from 'recharts';
-import { FaBars, FaChevronDown, FaChevronUp, FaRedo } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp, FaRedo } from 'react-icons/fa';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
+import '../styles/OfficerDashboardPage.css';
 
 const OfficerDashboardPage = () => {
-  const [officer, setOfficer] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sectionLoading, setSectionLoading] = useState({
@@ -20,9 +21,7 @@ const OfficerDashboardPage = () => {
     events: false,
     clearance: false,
   });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [membershipTab, setMembershipTab] = useState('all'); // 'all', '1st', '2nd'
-  const [paymentTab, setPaymentTab] = useState('all'); // 'all', '1st', '2nd'
+  const [paymentTab, setPaymentTab] = useState('all');
   const [visibleSeries, setVisibleSeries] = useState({});
   const [collapsedSections, setCollapsedSections] = useState({
     membership: false,
@@ -31,29 +30,43 @@ const OfficerDashboardPage = () => {
     clearance: false,
   });
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [yearFilter, setYearFilter] = useState('All Years');
+  const [blockFilter, setBlockFilter] = useState('All Blocks');
+  const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [searchQuery, setSearchQuery] = useState('');
   const token = localStorage.getItem('officerAccessToken');
+
+  const yearOptions = ['All Years', '1st Year', '2nd Year', '3rd Year', '4th Year'];
+  const blockOptions = ['All Blocks', 'A', 'B', 'C', 'D', 'E', 'F'];
+  const statusOptions = ['All Statuses', 'Active', 'Inactive'];
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const storedOfficer = localStorage.getItem('officerInfo');
-      const officerData = storedOfficer ? JSON.parse(storedOfficer) : null;
-      console.log('Officer Data:', officerData);
-      setOfficer(officerData);
-
       if (token) {
         setSectionLoading({ membership: true, payment: true, events: true, clearance: true });
-        const analyticsData = await getDashboardAnalytics(token, {});
-        console.log('Analytics Data:', analyticsData);
+        const [analyticsData, usersData] = await Promise.all([
+          getDashboardAnalytics(token, {
+            start_date: '2023-01-01T00:00:00Z',
+            end_date: '2025-12-31T23:59:59Z',
+            include_archived: false
+          }),
+          getUsers(token),
+        ]);
+        console.log('Raw Analytics Data:', JSON.stringify(analyticsData, null, 2));
+        console.log('Users Data:', usersData);
         if (!analyticsData || typeof analyticsData !== 'object') {
           throw new Error('Invalid analytics data received');
         }
         setAnalytics(analyticsData);
+        setUsers(usersData);
+        setFilteredUsers(usersData);
         setVisibleSeries({
-          membersByRequirement: { count: true },
           paymentDetails: { Verifying: true, Paid: true, 'Not Paid': true },
-          events: { participation_rate: true },
+          events: { participant_count: true },
           popularEvents: analyticsData?.eventsEngagement?.popularEvents?.reduce((acc, evt) => ({ ...acc, [evt.title]: true }), {}) || {},
           clearanceByRequirement: { Clear: true, Processing: true, 'Not Yet Cleared': true },
           complianceByYear: { Clear: true, Processing: true, 'Not Yet Cleared': true },
@@ -66,6 +79,8 @@ const OfficerDashboardPage = () => {
       console.error('Failed to fetch data:', error);
       setError(`Failed to load dashboard data: ${error.message}`);
       setAnalytics(null);
+      setUsers([]);
+      setFilteredUsers([]);
     } finally {
       setIsLoading(false);
       setSectionLoading({ membership: false, payment: false, events: false, clearance: false });
@@ -75,6 +90,34 @@ const OfficerDashboardPage = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    console.log('Analytics State Updated:', JSON.stringify(analytics, null, 2));
+  }, [analytics]);
+
+  useEffect(() => {
+    let filtered = users;
+    if (yearFilter !== 'All Years') {
+      filtered = filtered.filter(user => (user.year || '') === yearFilter);
+    }
+    if (blockFilter !== 'All Blocks') {
+      filtered = filtered.filter(user => (user.block || '') === blockFilter);
+    }
+    if (statusFilter !== 'All Statuses') {
+      filtered = filtered.filter(user => 
+        statusFilter === 'Active' ? isUserActive(user.last_active) : !isUserActive(user.last_active)
+      );
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(user =>
+        (user.full_name || '').toLowerCase().includes(query) ||
+        (user.email || '').toLowerCase().includes(query) ||
+        (user.student_number || '').toLowerCase().includes(query)
+      );
+    }
+    setFilteredUsers(filtered);
+  }, [yearFilter, blockFilter, statusFilter, searchQuery, users]);
 
   const handleLegendClick = (chartKey, dataKey) => {
     setVisibleSeries(prev => ({
@@ -93,42 +136,60 @@ const OfficerDashboardPage = () => {
     }));
   };
 
-  const handleMembershipTabChange = (tab) => {
-    setMembershipTab(tab);
-  };
-
   const handlePaymentTabChange = (tab) => {
     setPaymentTab(tab);
   };
 
+  const handleYearFilter = (year) => {
+    setYearFilter(year);
+  };
+
+  const handleBlockFilter = (block) => {
+    setBlockFilter(block);
+  };
+
+  const handleStatusFilter = (status) => {
+    setStatusFilter(status);
+  };
+
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const isUserActive = (lastActive) => {
+    if (!lastActive) return false;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return new Date(lastActive) >= thirtyDaysAgo;
+  };
+
   if (isLoading) {
-    return <div className="loading">Loading Officer Dashboard...</div>;
+    return <Loading message="Loading Officer Dashboard..." />;
   }
 
-  if (error || !officer || !analytics) {
+  if (error || !analytics) {
     return (
-      <div className="error-message">
-        {error || 'Unable to load dashboard data. Please try again later.'}
-        <button
-          onClick={fetchData}
-          className="retry-button"
-          style={{ marginTop: 'var(--spacing-md)' }}
-          aria-label="Retry loading data"
-        >
-          <FaRedo style={{ marginRight: 'var(--spacing-sm)' }} /> Retry
-        </button>
-      </div>
+      <OfficerLayout>
+        <div className="error-message">
+          {error || 'Unable to load dashboard data. Please try again later.'}
+          <button
+            onClick={fetchData}
+            className="retry-button"
+            aria-label="Retry loading data"
+          >
+            <FaRedo className="inline-block mr-2" /> Retry
+          </button>
+        </div>
+      </OfficerLayout>
     );
   }
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
   const membershipInsights = analytics.membershipInsights || {};
   const paymentAnalytics = analytics.paymentAnalytics || {};
-  const membersByRequirementData = Object.entries(membershipInsights.membersByRequirement || {}).map(
-    ([requirement, count]) => ({ requirement, count })
-  );
-
   const preferredPaymentData = paymentAnalytics.preferredPaymentMethods || [];
+  console.log('preferredPaymentData:', preferredPaymentData);
+  
   const transformPaymentDetails = (data) => {
     const arr = [];
     Object.entries(data || {}).forEach(([requirement, years]) => {
@@ -138,7 +199,7 @@ const OfficerDashboardPage = () => {
           requirement,
           year,
           Verifying: statuses.Verifying || 0,
-          Paid: statuses.paid || 0,
+          Paid: statuses.Paid || 0,
           'Not Paid': statuses['Not Paid'] || 0,
         });
       });
@@ -150,14 +211,17 @@ const OfficerDashboardPage = () => {
   const semesterPaymentData = paymentTab === '1st'
     ? preferredPaymentData.map(method => ({
         method: method.method,
-        count: method.firstSemCount,
+        count: method.firstSemCount || 0,
       }))
     : paymentTab === '2nd'
     ? preferredPaymentData.map(method => ({
         method: method.method,
-        count: method.secondSemCount,
+        count: method.secondSemCount || 0,
       }))
     : preferredPaymentData;
+  console.log('semesterPaymentData:', semesterPaymentData, 'paymentTab:', paymentTab);
+
+  const hasPaymentData = semesterPaymentData.length > 0 && semesterPaymentData.some(item => item.count > 0);
 
   const paymentStats = {
     verifying: paymentTab === '1st'
@@ -184,6 +248,7 @@ const OfficerDashboardPage = () => {
     name: evt.title,
     value: evt.participant_count || 0,
   }));
+  console.log('eventsData:', eventsData);
 
   const clearanceTracking = analytics.clearanceTracking || {};
   const clearanceByRequirementData = Object.entries(clearanceTracking.byRequirement || {}).map(
@@ -202,214 +267,135 @@ const OfficerDashboardPage = () => {
       'Not Yet Cleared': statuses['Not Yet Cleared'] || 0,
     })
   );
-
-  const filteredMembersByRequirementData = membershipTab === 'all'
-    ? membersByRequirementData
-    : membersByRequirementData.filter(data => data.requirement === `${membershipTab === '1st' ? '1st' : '2nd'} Semester Membership`);
-
-  const filteredPaymentDetailsData = paymentTab === 'all'
-    ? paymentDetailsData
-    : paymentDetailsData.filter(data => data.requirement === `${paymentTab === '1st' ? '1st' : '2nd'} Semester Membership`);
-
-  const noneSpecsCount = membershipTab === '1st'
-    ? (membershipInsights.noneSpecsFirstSem || membershipInsights.noneSpecs || 0)
-    : membershipTab === '2nd'
-    ? (membershipInsights.noneSpecsSecondSem || membershipInsights.noneSpecs || 0)
-    : (membershipInsights.noneSpecs || 0);
+  console.log('clearanceByRequirementData:', clearanceByRequirementData);
+  console.log('complianceByYearData:', complianceByYearData);
 
   return (
-    <div className={`layout-container ${isSidebarOpen ? 'sidebar-open' : ''}`} aria-label="Officer Dashboard">
-      <OfficerSidebar officer={officer} isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-      <div className="main-content">
-        <div className="dashboard-header sticky">
-          <div className="dashboard-left">
-            <h1 className="dashboard-title">
-              <button
-                className="sidebar-toggle-inside"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-              >
-                <FaBars aria-hidden="true" />
-              </button>
-              Officer Dashboard
-            </h1>
-          </div>
-        </div>
-
-        {/* Membership Insights with Tabs */}
-        <div className="card analytics-section">
+    <OfficerLayout>
+      <div className="dashboard-container">
+        {/* Student Insights */}
+        <div className="card">
           <div className="section-header" onClick={() => toggleSection('membership')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && toggleSection('membership')}>
-            <h2>Membership Insights</h2>
-            {collapsedSections.membership ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+            <h2>Student Insights</h2>
+            {collapsedSections.membership ? <FaChevronUp className="chevron-icon" /> : <FaChevronDown className="chevron-icon" />}
           </div>
           {!collapsedSections.membership && (
             sectionLoading.membership ? (
-              <div className="section-loading">Loading Membership Insights...</div>
+              <Loading message="Loading Student Insights..." />
             ) : (
-              <>
-                <div className="membership-tabs">
-                  <button
-                    className={`tab-button ${membershipTab === 'all' ? 'active' : ''}`}
-                    onClick={() => handleMembershipTabChange('all')}
-                    aria-label="Show all semesters membership data"
-                  >
-                    All Semesters
-                  </button>
-                  <button
-                    className={`tab-button ${membershipTab === '1st' ? 'active' : ''}`}
-                    onClick={() => handleMembershipTabChange('1st')}
-                    aria-label="Show 1st semester membership data"
-                  >
-                    1st Semester
-                  </button>
-                  <button
-                    className={`tab-button ${membershipTab === '2nd' ? 'active' : ''}`}
-                    onClick={() => handleMembershipTabChange('2nd')}
-                    aria-label="Show 2nd semester membership data"
-                  >
-                    2nd Semester
-                  </button>
-                </div>
-                <div className="tab-content">
-                  {membershipTab === 'all' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="cs-students-tooltip" data-tooltip-content="Total number of CS students registered">
-                          <p>Total CS Students</p>
-                          <h2>{membershipInsights.totalCSStudents || 0}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="specs-members-tooltip" data-tooltip-content="Members who have paid their dues">
-                          <p>Total Specs Members</p>
-                          <h2>{membershipInsights.totalSpecsMembers || 0}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="none-specs-tooltip" data-tooltip-content="Members who haven't paid or are still processing">
-                          <p>None Specs</p>
-                          <h2>{noneSpecsCount}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="active-members-tooltip" data-tooltip-content="Members active in the last 30 days">
-                          <p>Active Members</p>
-                          <h2>{membershipInsights.activeMembers || 0}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="inactive-members-tooltip" data-tooltip-content="Members not active in the last 30 days">
-                          <p>Inactive Members</p>
-                          <h2>{membershipInsights.inactiveMembers || 0}</h2>
+              <div className="section-content">
+                {membershipInsights.totalBSCSStudents === 0 ? (
+                  <p className="no-data">No BSCS students registered in the system. Please add users to display student insights.</p>
+                ) : (
+                  <>
+                    <div className="stats-grid">
+                      <div className="stat-box" data-tooltip-id="bscs-students-tooltip" data-tooltip-content="Total number of BSCS students registered">
+                        <p>Total BSCS Students</p>
+                        <h3>{membershipInsights.totalBSCSStudents || 0}</h3>
+                      </div>
+                      <div className="stat-box" data-tooltip-id="active-members-tooltip" data-tooltip-content="Members active in the last 30 days">
+                        <p>Active Members</p>
+                        <h3>{membershipInsights.activeMembers || 0}</h3>
+                      </div>
+                      <div className="stat-box" data-tooltip-id="inactive-members-tooltip" data-tooltip-content="Members not active in the last 30 days or never active">
+                        <p>Inactive Members</p>
+                        <h3>{membershipInsights.inactiveMembers || 0}</h3>
+                      </div>
+                    </div>
+                    <div className="table-box">
+                      <div className="table-header">
+                        <h4>BSCS Students</h4>
+                        <div className="filters">
+                          <input
+                            type="text"
+                            className="search-bar"
+                            placeholder="Search by name, email, or student number..."
+                            value={searchQuery}
+                            onChange={handleSearch}
+                            aria-label="Search students"
+                          />
+                          <select
+                            className="filter-select"
+                            value={yearFilter}
+                            onChange={(e) => handleYearFilter(e.target.value)}
+                            aria-label="Filter by year"
+                          >
+                            {yearOptions.map(year => (
+                              <option key={year} value={year}>{year}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="filter-select"
+                            value={blockFilter}
+                            onChange={(e) => handleBlockFilter(e.target.value)}
+                            aria-label="Filter by block"
+                          >
+                            {blockOptions.map(block => (
+                              <option key={block} value={block}>{block}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="filter-select"
+                            value={statusFilter}
+                            onChange={(e) => handleStatusFilter(e.target.value)}
+                            aria-label="Filter by status"
+                          >
+                            {statusOptions.map(status => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
-                      <div className="chart-box">
-                        <h3>Members by Requirement</h3>
-                        {filteredMembersByRequirementData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={filteredMembersByRequirementData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="requirement" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('membersByRequirement', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.membersByRequirement?.count && (
-                                <Bar dataKey="count" fill="#3B82F6" name="Specs Members" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No data available.</p>}
-                      </div>
-                    </>
-                  )}
-                  {membershipTab === '1st' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="cs-students-tooltip" data-tooltip-content="Total number of CS students registered">
-                          <p>Total CS Students</p>
-                          <h2>{membershipInsights.totalCSStudents || 0}</h2>
+                      {filteredUsers.length > 0 ? (
+                        <div className="table-container">
+                          <table className="student-table">
+                            <thead>
+                              <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Student Number</th>
+                                <th>Year</th>
+                                <th>Block</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredUsers.map(user => (
+                                <tr key={user.id}>
+                                  <td>{user.id}</td>
+                                  <td>{user.full_name || 'N/A'}</td>
+                                  <td>{user.student_number || 'N/A'}</td>
+                                  <td>{user.year || 'N/A'}</td>
+                                  <td>{user.block || 'N/A'}</td>
+                                  <td>{user.email || 'N/A'}</td>
+                                  <td>{isUserActive(user.last_active) ? 'Active' : 'Inactive'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                        <div className="stat-box-semester" data-tooltip-id="specs-members-first-sem-tooltip" data-tooltip-content="Members who paid dues in 1st semester">
-                          <p>Specs Members (1st Sem)</p>
-                          <h2>{membershipInsights.totalSpecsMembersFirstSem || 0}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="none-specs-tooltip" data-tooltip-content="Members who haven't paid or are still processing in 1st semester">
-                          <p>None Specs</p>
-                          <h2>{noneSpecsCount}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="active-members-tooltip" data-tooltip-content="Members active in the last 30 days">
-                          <p>Active Members</p>
-                          <h2>{membershipInsights.activeMembers || 0}</h2>
-                        </div>
-                      </div>
-                      <div className="chart-box">
-                        <h3>Members by Requirement (1st Semester)</h3>
-                        {filteredMembersByRequirementData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={filteredMembersByRequirementData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="requirement" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('membersByRequirement', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.membersByRequirement?.count && (
-                                <Bar dataKey="count" fill="#3B82F6" name="Specs Members" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No data available for 1st Semester.</p>}
-                      </div>
-                    </>
-                  )}
-                  {membershipTab === '2nd' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="cs-students-tooltip" data-tooltip-content="Total number of CS students registered">
-                          <p>Total CS Students</p>
-                          <h2>{membershipInsights.totalCSStudents || 0}</h2>
-                        </div>
-                        <div className="stat-box-semester" data-tooltip-id="specs-members-second-sem-tooltip" data-tooltip-content="Members who paid dues in 2nd semester">
-                          <p>Specs Members (2nd Sem)</p>
-                          <h2>{membershipInsights.totalSpecsMembersSecondSem || 0}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="none-specs-tooltip" data-tooltip-content="Members who haven't paid or are still processing in 2nd semester">
-                          <p>None Specs</p>
-                          <h2>{noneSpecsCount}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="active-members-tooltip" data-tooltip-content="Members active in the last 30 days">
-                          <p>Active Members</p>
-                          <h2>{membershipInsights.activeMembers || 0}</h2>
-                        </div>
-                      </div>
-                      <div className="chart-box">
-                        <h3>Members by Requirement (2nd Semester)</h3>
-                        {filteredMembersByRequirementData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={filteredMembersByRequirementData}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="requirement" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('membersByRequirement', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.membersByRequirement?.count && (
-                                <Bar dataKey="count" fill="#10B981" name="Specs Members" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No data available for 2nd Semester.</p>}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
+                      ) : <p className="no-data">No BSCS students found.</p>}
+                    </div>
+                  </>
+                )}
+              </div>
             )
           )}
         </div>
 
-        {/* Payment Analytics with Tabs */}
-        <div className="card analytics-section">
+        {/* Payment Analytics */}
+        <div className="card">
           <div className="section-header" onClick={() => toggleSection('payment')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && toggleSection('payment')}>
             <h2>Payment Analytics</h2>
-            {collapsedSections.payment ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+            {collapsedSections.payment ? <FaChevronUp className="chevron-icon" /> : <FaChevronDown className="chevron-icon" />}
           </div>
           {!collapsedSections.payment && (
             sectionLoading.payment ? (
-              <div className="section-loading">Loading Payment Analytics...</div>
+              <Loading message="Loading Payment Analytics..." />
             ) : (
-              <>
-                <div className="payment-tabs">
+              <div className="section-content">
+                <div className="tabs">
                   <button
                     className={`tab-button ${paymentTab === 'all' ? 'active' : ''}`}
                     onClick={() => handlePaymentTabChange('all')}
@@ -432,242 +418,104 @@ const OfficerDashboardPage = () => {
                     2nd Semester
                   </button>
                 </div>
-                <div className="tab-content">
-                  {paymentTab === 'all' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="verifying-tooltip" data-tooltip-content="Payments under verification">
-                          <p>Verifying</p>
-                          <h2>{paymentStats.verifying}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="paid-tooltip" data-tooltip-content="Members with confirmed payments">
-                          <p>Paid</p>
-                          <h2>{paymentStats.paid}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="not-paid-tooltip" data-tooltip-content="Members who haven't paid">
-                          <p>Not Paid</p>
-                          <h2>{paymentStats.notPaid}</h2>
-                        </div>
-                      </div>
-                      <div className="chart-box">
-                        <h3>Preferred Payment Methods</h3>
-                        {preferredPaymentData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={preferredPaymentData}
-                                dataKey="count"
-                                nameKey="method"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={100}
-                                fill="#3B82F6"
-                                label
-                              >
-                                {preferredPaymentData.map((entry, index) => (
-                                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('preferredPayment', e.dataKey)} verticalAlign="bottom" />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        ) : <p>No preferred payment methods data.</p>}
-                      </div>
-                      <div className="chart-box">
-                        <h3>Payment Details by Requirement & Year</h3>
-                        {paymentDetailsData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={paymentDetailsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="label" angle={-45} textAnchor="end" height={80} />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('paymentDetails', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.paymentDetails?.Verifying && (
-                                <Bar dataKey="Verifying" fill="#F59E0B" />
-                              )}
-                              {visibleSeries.paymentDetails?.Paid && (
-                                <Bar dataKey="Paid" fill="#10B981" />
-                              )}
-                              {visibleSeries.paymentDetails?.['Not Paid'] && (
-                                <Bar dataKey="Not Paid" fill="#EF4444" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No payment details data available.</p>}
-                      </div>
-                    </>
-                  )}
-                  {paymentTab === '1st' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="verifying-tooltip" data-tooltip-content="Payments under verification in 1st semester">
-                          <p>Verifying</p>
-                          <h2>{paymentStats.verifying}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="paid-tooltip" data-tooltip-content="Members with confirmed payments in 1st semester">
-                          <p>Paid</p>
-                          <h2>{paymentStats.paid}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="not-paid-tooltip" data-tooltip-content="Members who haven't paid in 1st semester">
-                          <p>Not Paid</p>
-                          <h2>{paymentStats.notPaid}</h2>
-                        </div>
-                      </div>
-                      <div className="chart-box">
-                        <h3>Preferred Payment Methods (1st Semester)</h3>
-                        {semesterPaymentData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={semesterPaymentData}
-                                dataKey="count"
-                                nameKey="method"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={100}
-                                fill="#3B82F6"
-                                label
-                              >
-                                {semesterPaymentData.map((entry, index) => (
-                                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('preferredPayment', e.dataKey)} verticalAlign="bottom" />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        ) : <p>No payment methods data for 1st Semester.</p>}
-                      </div>
-                      <div className="chart-box">
-                        <h3>Payment Details by Requirement & Year (1st Semester)</h3>
-                        {filteredPaymentDetailsData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={filteredPaymentDetailsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="label" angle={-45} textAnchor="end" height={80} />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('paymentDetails', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.paymentDetails?.Verifying && (
-                                <Bar dataKey="Verifying" fill="#F59E0B" />
-                              )}
-                              {visibleSeries.paymentDetails?.Paid && (
-                                <Bar dataKey="Paid" fill="#3B82F6" />
-                              )}
-                              {visibleSeries.paymentDetails?.['Not Paid'] && (
-                                <Bar dataKey="Not Paid" fill="#EF4444" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No payment details data available for 1st Semester.</p>}
-                      </div>
-                    </>
-                  )}
-                  {paymentTab === '2nd' && (
-                    <>
-                      <div className="stats-row">
-                        <div className="stat-box" data-tooltip-id="verifying-tooltip" data-tooltip-content="Payments under verification in 2nd semester">
-                          <p>Verifying</p>
-                          <h2>{paymentStats.verifying}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="paid-tooltip" data-tooltip-content="Members with confirmed payments in 2nd semester">
-                          <p>Paid</p>
-                          <h2>{paymentStats.paid}</h2>
-                        </div>
-                        <div className="stat-box" data-tooltip-id="not-paid-tooltip" data-tooltip-content="Members who haven't paid in 2nd semester">
-                          <p>Not Paid</p>
-                          <h2>{paymentStats.notPaid}</h2>
-                        </div>
-                      </div>
-                      <div className="chart-box">
-                        <h3>Preferred Payment Methods (2nd Semester)</h3>
-                        {semesterPaymentData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={semesterPaymentData}
-                                dataKey="count"
-                                nameKey="method"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={100}
-                                fill="#10B981"
-                                label
-                              >
-                                {semesterPaymentData.map((entry, index) => (
-                                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('preferredPayment', e.dataKey)} verticalAlign="bottom" />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        ) : <p>No payment methods data for 2nd Semester.</p>}
-                      </div>
-                      <div className="chart-box">
-                        <h3>Payment Details by Requirement & Year (2nd Semester)</h3>
-                        {filteredPaymentDetailsData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={filteredPaymentDetailsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="label" angle={-45} textAnchor="end" height={80} />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend onClick={(e) => handleLegendClick('paymentDetails', e.dataKey)} verticalAlign="bottom" />
-                              {visibleSeries.paymentDetails?.Verifying && (
-                                <Bar dataKey="Verifying" fill="#F59E0B" />
-                              )}
-                              {visibleSeries.paymentDetails?.Paid && (
-                                <Bar dataKey="Paid" fill="#10B981" />
-                              )}
-                              {visibleSeries.paymentDetails?.['Not Paid'] && (
-                                <Bar dataKey="Not Paid" fill="#EF4444" />
-                              )}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        ) : <p>No payment details data available for 2nd Semester.</p>}
-                      </div>
-                    </>
-                  )}
+                <div className="stats-grid">
+                  <div className="stat-box" data-tooltip-id="verifying-tooltip" data-tooltip-content="Payments under verification">
+                    <p>Verifying</p>
+                    <h3>{paymentStats.verifying}</h3>
+                  </div>
+                  <div className="stat-box" data-tooltip-id="paid-tooltip" data-tooltip-content="Members with confirmed payments">
+                    <p>Paid</p>
+                    <h3>{paymentStats.paid}</h3>
+                  </div>
+                  <div className="stat-box" data-tooltip-id="not-paid-tooltip" data-tooltip-content="Members who haven't paid">
+                    <p>Not Paid</p>
+                    <h3>{paymentStats.notPaid}</h3>
+                  </div>
                 </div>
-              </>
+                <div className="chart-box">
+                  <h4>Preferred Payment Methods</h4>
+                  {hasPaymentData ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={semesterPaymentData}
+                          dataKey="count"
+                          nameKey="method"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          fill="#3B82F6"
+                          label
+                        >
+                          {semesterPaymentData.map((entry, index) => (
+                            <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend onClick={(e) => handleLegendClick('preferredPayment', e.dataKey)} verticalAlign="bottom" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : <p className="no-data">No payment method data available. Ensure payments have been recorded with valid payment methods.</p>}
+                </div>
+                <div className="chart-box">
+                  <h4>Payment Details by Requirement & Year</h4>
+                  {paymentDetailsData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={paymentDetailsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" angle={-45} textAnchor="end" height={80} />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend onClick={(e) => handleLegendClick('paymentDetails', e.dataKey)} verticalAlign="bottom" />
+                        {visibleSeries.paymentDetails?.Verifying && (
+                          <Bar dataKey="Verifying" fill="#F59E0B" />
+                        )}
+                        {visibleSeries.paymentDetails?.Paid && (
+                          <Bar dataKey="Paid" fill="#10B981" />
+                        )}
+                        {visibleSeries.paymentDetails?.['Not Paid'] && (
+                          <Bar dataKey="Not Paid" fill="#EF4444" />
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : <p className="no-data">No payment details data available.</p>}
+                </div>
+              </div>
             )
           )}
         </div>
 
         {/* Events Engagement */}
-        <div className="card analytics-section">
+        <div className="card">
           <div className="section-header" onClick={() => toggleSection('events')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && toggleSection('events')}>
             <h2>Events Engagement</h2>
-            {collapsedSections.events ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+            {collapsedSections.events ? <FaChevronUp className="chevron-icon" /> : <FaChevronDown className="chevron-icon" />}
           </div>
           {!collapsedSections.events && (
             sectionLoading.events ? (
-              <div className="section-loading">Loading Events Engagement...</div>
+              <Loading message="Loading Events Engagement..." />
             ) : (
-              <>
+              <div className="section-content">
                 <div className="chart-box">
-                  <h3>All Events - Participation Rate</h3>
+                  <h4>All Events - Participant Count</h4>
                   {eventsData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={eventsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="title" />
-                        <YAxis label={{ value: 'Participation Rate (%)', angle: -90, position: 'insideLeft' }} />
+                        <YAxis label={{ value: 'Participants', angle: -90, position: 'insideLeft' }} />
                         <Tooltip />
                         <Legend onClick={(e) => handleLegendClick('events', e.dataKey)} verticalAlign="bottom" />
-                        {visibleSeries.events?.participation_rate && (
-                          <Bar dataKey="participation_rate" fill="#10B981" />
+                        {visibleSeries.events?.participant_count && (
+                          <Bar dataKey="participant_count" fill="#10B981" />
                         )}
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : <p>No events data available.</p>}
+                  ) : <p className="no-data">No events data available. Ensure events are recorded and not all archived.</p>}
                 </div>
                 <div className="chart-box">
-                  <h3>Popular Events</h3>
-                  {popularEventsPieData.length > 0 ? (
+                  <h4>Popular Events</h4>
+                  {popularEventsPieData.length > 0 && popularEventsPieData.some(event => event.value > 0) ? (
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
@@ -688,27 +536,27 @@ const OfficerDashboardPage = () => {
                         <Legend onClick={(e) => handleLegendClick('popularEvents', e.dataKey)} verticalAlign="bottom" />
                       </PieChart>
                     </ResponsiveContainer>
-                  ) : <p>No popular events data.</p>}
+                  ) : <p className="no-data">No popular events data. Ensure events have participant data.</p>}
                 </div>
-              </>
+              </div>
             )
           )}
         </div>
 
         {/* Clearance Tracking */}
-        <div className="card analytics-section">
+        <div className="card">
           <div className="section-header" onClick={() => toggleSection('clearance')} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && toggleSection('clearance')}>
             <h2>Clearance Tracking</h2>
-            {collapsedSections.clearance ? <FaChevronUp aria-hidden="true" /> : <FaChevronDown aria-hidden="true" />}
+            {collapsedSections.clearance ? <FaChevronUp className="chevron-icon" /> : <FaChevronDown className="chevron-icon" />}
           </div>
           {!collapsedSections.clearance && (
             sectionLoading.clearance ? (
-              <div className="section-loading">Loading Clearance Tracking...</div>
+              <Loading message="Loading Clearance Tracking..." />
             ) : (
-              <>
+              <div className="section-content">
                 <div className="chart-box">
-                  <h3>Clearance by Requirement</h3>
-                  {clearanceByRequirementData.length > 0 ? (
+                  <h4>Clearance by Requirement</h4>
+                  {clearanceByRequirementData.length > 0 && clearanceByRequirementData.some(item => item.Clear > 0 || item.Processing > 0 || item['Not Yet Cleared'] > 0) ? (
                     clearanceByRequirementData.map((item, idx) => (
                       <ResponsiveContainer key={idx} width="100%" height={250}>
                         <BarChart data={[item]} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -729,11 +577,11 @@ const OfficerDashboardPage = () => {
                         </BarChart>
                       </ResponsiveContainer>
                     ))
-                  ) : <p>No clearance tracking data available.</p>}
+                  ) : <p className="no-data">No clearance tracking data available.</p>}
                 </div>
                 <div className="chart-box">
-                  <h3>Compliance by Year</h3>
-                  {complianceByYearData.length > 0 ? (
+                  <h4>Compliance by Year</h4>
+                  {complianceByYearData.length > 0 && complianceByYearData.some(item => item.Clear > 0 || item.Processing > 0 || item['Not Yet Cleared'] > 0) ? (
                     <ResponsiveContainer width="100%" height={250}>
                       <BarChart data={complianceByYearData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -752,25 +600,21 @@ const OfficerDashboardPage = () => {
                         )}
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : <p>No compliance data available.</p>}
+                  ) : <p className="no-data">No compliance data available.</p>}
                 </div>
-              </>
+              </div>
             )
           )}
         </div>
 
-        <ReactTooltip id="cs-students-tooltip" place="top" />
-        <ReactTooltip id="specs-members-tooltip" place="top" />
-        <ReactTooltip id="specs-members-first-sem-tooltip" place="top" />
-        <ReactTooltip id="specs-members-second-sem-tooltip" place="top" />
+        <ReactTooltip id="bscs-students-tooltip" place="top" />
         <ReactTooltip id="active-members-tooltip" place="top" />
         <ReactTooltip id="inactive-members-tooltip" place="top" />
-        <ReactTooltip id="none-specs-tooltip" place="top" />
         <ReactTooltip id="verifying-tooltip" place="top" />
         <ReactTooltip id="paid-tooltip" place="top" />
         <ReactTooltip id="not-paid-tooltip" place="top" />
       </div>
-    </div>
+    </OfficerLayout>
   );
 };
 

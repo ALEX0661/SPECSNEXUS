@@ -8,6 +8,7 @@ const allowedRoutes = ['/dashboard', '/profile', '/events', '/announcements', '/
 const Chatbot = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [messages, setMessages] = useState([
     { sender: 'bot', text: 'Hello! I am SPECS Assistance. How may I help you today?' }
   ]);
@@ -15,9 +16,24 @@ const Chatbot = () => {
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Handle resize to detect mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Close chatbot on route change
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const toggleChat = () => {
     setIsOpen(prev => !prev);
@@ -36,7 +52,7 @@ const Chatbot = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:8000/chat/", { message: userMessage.text });
+      const response = await axios.post("https://specs-nexus-production.up.railway.app/chat/", { message: userMessage.text });
       const botResponse = response.data.response;
       setMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
     } catch (error) {
@@ -56,17 +72,28 @@ const Chatbot = () => {
 
   return (
     <>
-      <div className="chatbot-button" onClick={toggleChat}>
+      <button
+        className="chatbot-button"
+        onClick={toggleChat}
+        aria-label="Toggle chatbot"
+        aria-expanded={isOpen}
+      >
         <i className="fas fa-robot"></i>
-      </div>
+      </button>
       {isOpen && (
-        <div className="chatbot-container">
+        <div className="chatbot-container" role="dialog" aria-label="SPECS Assistance Chatbot">
           <div className="chatbot-header">
-            <div>
+            <div className="header-text">
               <span className="specs-text">SPECS</span>
               <span className="assistance-text"> Assistance</span>
             </div>
-            <button className="close-button" onClick={toggleChat}>×</button>
+            <button
+              className="closed-button"
+              onClick={toggleChat}
+              aria-label="Close chatbot"
+            >
+              ×
+            </button>
           </div>
           <div className="chatbot-messages">
             {messages.map((msg, idx) => (
@@ -93,8 +120,12 @@ const Chatbot = () => {
               placeholder="Type your message..."
               onKeyDown={(e) => { if (e.key === 'Enter') sendMessage(); }}
               disabled={loading}
+              aria-label="Chat message input"
+              autoComplete="off"
             />
-            <button onClick={sendMessage} disabled={loading}>Send</button>
+            <button onClick={sendMessage} disabled={loading} aria-label="Send message">
+              Send
+            </button>
           </div>
         </div>
       )}

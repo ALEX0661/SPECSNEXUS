@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://specs-nexus-production.up.railway.app';
 
 export async function getOfficers() {
   const token = localStorage.getItem('officerAccessToken');

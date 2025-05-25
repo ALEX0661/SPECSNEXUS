@@ -147,8 +147,8 @@
   background-color: white;
 }
 
-.event-title {
-  font-size: 14.4px; /* Reduced from 16px */
+.events-title {
+  font-size: 24px; /* Reduced from 16px */
   font-weight: 700;
   margin: 0 0 9px 0; /* Reduced from 10px */
   color: #333;

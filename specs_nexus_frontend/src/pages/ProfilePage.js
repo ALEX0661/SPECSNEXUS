@@ -1,14 +1,23 @@
-// ProfilePage.js
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import Layout from '../components/Layout';
-import { getProfile } from '../services/userService';
+import { getProfile, updateProfile } from '../services/userService';
 import ProfileCard from '../components/ProfileCard';
+import StatusModal from '../components/StatusModal';
+import Loading from '../components/Loading';
 import '../styles/ProfilePage.css';
 
 const ProfilePage = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const token = localStorage.getItem('accessToken'); // Retrieve auth token
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
+  const token = localStorage.getItem('accessToken');
+  const navigate = useNavigate(); // Initialize navigate
 
   useEffect(() => {
     async function fetchProfile() {
@@ -24,21 +33,51 @@ const ProfilePage = () => {
     fetchProfile();
   }, [token]);
 
-  // Render loading state
+  const handleUpdateProfile = async (updatedData) => {
+    try {
+      const updatedUser = await updateProfile(token, updatedData);
+      setUser(updatedUser);
+      setModalState({
+        isOpen: true,
+        type: 'success',
+        title: 'Profile Updated',
+        message: 'Your profile has been successfully updated.'
+      });
+    } catch (error) {
+      console.error('Failed to update user profile:', error);
+      setModalState({
+        isOpen: true,
+        type: 'error',
+        title: 'Profile Update Failed',
+        message: 'Failed to update profile. Please try again.'
+      });
+    }
+  };
+
+  const closeModal = () => {
+    setModalState({ ...modalState, isOpen: false });
+  };
+
   if (isLoading) {
-    return <div className="loading">Loading Profile...</div>;
+    return <Loading message="Loading Profile..." />;
   }
 
-  // Render error state
   if (!user) {
-    return <div className="error-message">Unable to load profile data. Please try again later.</div>;
+    navigate('/'); // Redirect to login page
+    return null; // Prevent rendering anything else
   }
 
-  // Render profile content within layout
   return (
     <Layout user={user}>
       <div className="profile-section">
-        <ProfileCard user={user} />
+        <ProfileCard user={user} onUpdate={handleUpdateProfile} />
+        <StatusModal
+          isOpen={modalState.isOpen}
+          onClose={closeModal}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+        />
       </div>
     </Layout>
   );

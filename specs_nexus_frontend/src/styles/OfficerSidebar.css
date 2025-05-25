@@ -12,7 +12,7 @@
   transition: all 0.3s ease;
   z-index: 1000;
   overflow-y: auto;
-  overflow-x: hidden; /* Prevent horizontal scrolling */
+  overflow-x: hidden;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
 }
 
@@ -31,7 +31,7 @@
   margin: 0;
   font-weight: 600;
   letter-spacing: 1px;
-  white-space: nowrap; /* Prevent text wrapping */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -56,7 +56,7 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 0.75rem;
-  flex-shrink: 0; /* Prevent icon from shrinking */
+  flex-shrink: 0;
 }
 
 .user-info {
@@ -85,7 +85,7 @@
 nav {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden; /* Prevent horizontal scrolling in nav */
+  overflow-x: hidden;
 }
 
 nav ul {
@@ -96,7 +96,7 @@ nav ul {
 
 nav ul li {
   margin: 0.25rem 0;
-  width: 100%; /* Ensure list items don't overflow */
+  width: 100%;
 }
 
 nav ul li a {
@@ -107,7 +107,7 @@ nav ul li a {
   padding: 0.75rem 1.5rem;
   transition: all 0.2s ease;
   position: relative;
-  white-space: nowrap; /* Prevent text wrapping */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -136,7 +136,7 @@ nav ul li a.active::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0; /* Prevent icon from shrinking */
+  flex-shrink: 0;
 }
 
 .nav-text {
@@ -157,7 +157,7 @@ nav ul li a.active::before {
   margin: 1rem;
   border-radius: 6px;
   transition: background-color 0.2s ease;
-  white-space: nowrap; /* Prevent text wrapping */
+  white-space: nowrap;
 }
 
 .logout-btn:hover {

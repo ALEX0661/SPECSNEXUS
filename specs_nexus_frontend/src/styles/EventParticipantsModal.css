@@ -1,95 +1,223 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+
 .ep-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0,0,0,0.5);
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
   z-index: 1000;
+  font-family: 'Poppins', sans-serif;
 }
 
 .ep-modal-container {
-  background: #fff;
-  padding: 2rem;
+  background: white;
   border-radius: 8px;
-  width: 90%;
+  padding: 24px;
+  width: 100%;
   max-width: 600px;
-  position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   max-height: 80vh;
   overflow-y: auto;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .ep-modal-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: transparent;
+  top: 16px;
+  right: 16px;
+  background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 24px;
   cursor: pointer;
+  color: #2d5641;
+  transition: color 0.2s;
+}
+
+.ep-modal-close:hover {
+  color: #1e3a2c;
 }
 
 .ep-modal-container h2 {
-  margin-top: 0;
+  color: #2d5641;
+  margin: 0 0 16px;
+  font-weight: 600;
+  font-size: 24px;
 }
 
-.participant-count {
-  font-size: 1rem;
-  margin-bottom: 1rem;
+.ep-search-container {
+  margin-bottom: 16px;
+}
+
+.ep-search-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.ep-search-input:focus {
+  outline: none;
+  border-color: #2d5641;
+  box-shadow: 0 0 0 2px rgba(45, 86, 65, 0.2);
+}
+
+.ep-participant-stats {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.ep-participants-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.ep-participant-item {
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.2s;
+}
+
+.ep-participant-item:hover {
+  background: #f8faf9;
+}
+
+.ep-participant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.ep-participant-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2d5641;
+}
+
+.ep-participant-email-link {
+  color: #2d5641;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ep-participant-email-link:hover {
+  text-decoration: underline;
+}
+
+.ep-participant-details {
+  display: flex;
+  flex-direction: column;
+  color: #666;
+  font-size: 14px;
+}
+
+.ep-participant-email {
+  color: #888;
+  font-size: 13px;
+}
+
+.ep-no-results {
+  color: #666;
+  text-align: center;
+  padding: 20px;
+}
+
+.ep-loading {
+  text-align: center;
+  padding: 20px;
+  color: #2d5641;
+  font-weight: 500;
+}
+
+.ep-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.ep-copy-emails-btn, .ep-send-email-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'Poppins', sans-serif;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.ep-copy-emails-btn {
+  background: #e0e0e0;
   color: #333;
 }
 
-.participants-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+.ep-copy-emails-btn:hover {
+  background: #d0d0d0;
+  transform: translateY(-1px);
 }
 
-.participant-item {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #fefefe;
+.ep-send-email-btn {
+  background: #2d5641;
+  color: white;
 }
 
-.participant-name {
-  margin: 0;
-  font-size: 1rem;
+.ep-send-email-btn:hover {
+  background: #1e3a2c;
+  transform: translateY(-1px);
 }
 
-.participant-info {
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
-  color: #555;
+.ep-copy-emails-btn:disabled, .ep-send-email-btn:disabled {
+  background: #f0f0f0;
+  color: #aaa;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.participant-email {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #007bff;
-  word-break: break-all;
+.ep-modal-actions a.disabled {
+  pointer-events: none;
 }
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.send-email-btn {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  padding: 0.75rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.send-email-btn:hover {
-  background-color: #0056b3;
+@media (max-width: 480px) {
+  .ep-modal-container {
+    margin: 16px;
+    padding: 16px;
+  }
+  
+  .ep-modal-container h2 {
+    font-size: 20px;
+  }
+  
+  .ep-participant-name {
+    font-size: 14px;
+  }
+  
+  .ep-modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

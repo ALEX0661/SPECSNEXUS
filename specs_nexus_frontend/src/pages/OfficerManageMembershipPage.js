@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import OfficerLayout from '../components/OfficerLayout';
 import {
@@ -10,10 +10,17 @@ import {
   deleteOfficerRequirement,
   uploadOfficerQRCode,
   getQRCode,
-  createOfficerRequirement
+  createOfficerRequirement,
 } from '../services/officerMembershipService';
 import OfficerMembershipModal from '../components/OfficerMembershipModal';
 import OfficerDenialReasonModal from '../components/OfficerDenialReasonModal';
+import OfficerRequirementModal from '../components/OfficerRequirementModal';
+import OfficerQRManagementModal from '../components/OfficerQRManagementModal';
+import OfficerAddRequirementModal from '../components/OfficerAddRequirementModal';
+import ReceiptModal from '../components/ReceiptModal';
+import StatusModal from '../components/StatusModal';
+import ConfirmationModal from '../components/ConfirmationModal';
+import Loading from '../components/Loading';
 import '../styles/OfficerManageMembershipPage.css';
 
 const OfficerManageMembershipPage = () => {
@@ -25,6 +32,8 @@ const OfficerManageMembershipPage = () => {
   const [showQRManagementModal, setShowQRManagementModal] = useState(false);
   const [showAddRequirementModal, setShowAddRequirementModal] = useState(false);
   const [showDenialReasonModal, setShowDenialReasonModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceiptUrl, setSelectedReceiptUrl] = useState(null);
   const [selectedMembershipId, setSelectedMembershipId] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
   const [filterBlock, setFilterBlock] = useState('All');
@@ -32,69 +41,66 @@ const OfficerManageMembershipPage = () => {
   const [filterRequirement, setFilterRequirement] = useState('All');
   const [searchName, setSearchName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    isLoading: false,
+  });
 
   const token = localStorage.getItem('officerAccessToken');
   const navigate = useNavigate();
+
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const [membershipData, requirementData] = await Promise.all([
+        getOfficerMemberships(token),
+        getOfficerRequirements(token),
+      ]);
+      console.log('Membership Data:', membershipData);
+      console.log('Sample payment_method:', membershipData[0]?.payment_method);
+      setMemberships(membershipData);
+      setRequirements(requirementData);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('officerAccessToken');
+        localStorage.removeItem('officerInfo');
+        navigate('/officer-login');
+      } else {
+        setStatusModal({
+          isOpen: true,
+          title: 'Error Fetching Data',
+          message: 'Failed to load memberships or requirements. Please try again.',
+          type: 'error',
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token, navigate]);
 
   useEffect(() => {
     if (!token) {
       navigate('/officer-login');
       return;
     }
-
-    async function fetchOfficerInfo() {
-      try {
-        const storedOfficer = localStorage.getItem('officerInfo');
-        if (!storedOfficer) {
-          navigate('/officer-login');
-        }
-      } catch (error) {
-        console.error("Failed to load officer info:", error);
-        navigate('/officer-login');
-      } finally {
-        setIsLoading(false);
-      }
+    const storedOfficer = localStorage.getItem('officerInfo');
+    if (!storedOfficer) {
+      navigate('/officer-login');
+    } else {
+      fetchData();
     }
-    fetchOfficerInfo();
-  }, [token, navigate]);
-
-  useEffect(() => {
-    if (!token || isLoading) return;
-
-    async function fetchMemberships() {
-      try {
-        const data = await getOfficerMemberships(token);
-        setMemberships(data);
-      } catch (error) {
-        console.error("Failed to fetch memberships:", error);
-        if (error.response?.status === 401) {
-          localStorage.removeItem('officerAccessToken');
-          localStorage.removeItem('officerInfo');
-          navigate('/officer-login');
-        }
-      }
-    }
-    fetchMemberships();
-  }, [token, isLoading, navigate]);
-
-  useEffect(() => {
-    if (!token || isLoading) return;
-
-    async function fetchRequirements() {
-      try {
-        const data = await getOfficerRequirements(token);
-        setRequirements(data);
-      } catch (error) {
-        console.error("Failed to fetch requirements:", error);
-        if (error.response?.status === 401) {
-          localStorage.removeItem('officerAccessToken');
-          localStorage.removeItem('officerInfo');
-          navigate('/officer-login');
-        }
-      }
-    }
-    fetchRequirements();
-  }, [token, isLoading, navigate]);
+  }, [token, navigate, fetchData]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -105,81 +111,121 @@ const OfficerManageMembershipPage = () => {
       setSelectedMembershipId(membershipId);
       setShowDenialReasonModal(true);
     } else {
-      try {
-        await verifyOfficerMembership(membershipId, action, null, token);
-        const updated = await getOfficerMemberships(token);
-        setMemberships(updated);
-        alert(`Membership ${action}d successfully!`);
-      } catch (error) {
-        console.error("Error updating membership verification:", error);
-        if (error.response?.status === 401) {
-          localStorage.removeItem('officerAccessToken');
-          localStorage.removeItem('officerInfo');
-          navigate('/officer-login');
-        } else {
-          alert(`Error ${action}ing membership: ${error.response?.data?.detail || 'Unknown error'}`);
-        }
-      }
+      setConfirmationModal({
+        isOpen: true,
+        title: 'Approve Membership',
+        message: 'Are you sure you want to approve this membership payment?',
+        onConfirm: async () => {
+          setConfirmationModal((prev) => ({ ...prev, isLoading: true }));
+          try {
+            await verifyOfficerMembership(membershipId, action, null, token);
+            await fetchData();
+            setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            setStatusModal({
+              isOpen: true,
+              title: 'Membership Approved',
+              message: 'The membership payment has been approved successfully.',
+              type: 'success',
+            });
+          } catch (error) {
+            console.error('Error approving membership:', error);
+            setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+            setStatusModal({
+              isOpen: true,
+              title: 'Error Approving Membership',
+              message: error.response?.data?.detail || 'Failed to approve membership. Please try again.',
+              type: 'error',
+            });
+          }
+        },
+        isLoading: false,
+      });
     }
   };
 
   const handleDenialReasonSubmit = async (denialReason) => {
-    try {
-      await verifyOfficerMembership(selectedMembershipId, 'deny', denialReason, token);
-      const updated = await getOfficerMemberships(token);
-      setMemberships(updated);
-      alert("Membership denied successfully!");
-      setShowDenialReasonModal(false);
-      setSelectedMembershipId(null);
-    } catch (error) {
-      console.error("Error denying membership:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('officerAccessToken');
-        localStorage.removeItem('officerInfo');
-        navigate('/officer-login');
-      } else {
-        alert(`Error denying membership: ${error.response?.data?.detail || 'Unknown error'}`);
-      }
-    }
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Confirm Denial',
+      message: `Are you sure you want to deny this membership payment with reason: "${denialReason}"?`,
+      onConfirm: async () => {
+        setConfirmationModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await verifyOfficerMembership(selectedMembershipId, 'deny', denialReason, token);
+          await fetchData();
+          setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          setStatusModal({
+            isOpen: true,
+            title: 'Membership Denied',
+            message: 'The membership payment has been denied successfully.',
+            type: 'success',
+          });
+          setShowDenialReasonModal(false);
+          setSelectedMembershipId(null);
+        } catch (error) {
+          console.error('Error denying membership:', error);
+          setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          setStatusModal({
+            isOpen: true,
+            title: 'Error Denying Membership',
+            message: error.response?.data?.detail || 'Failed to deny membership. Please try again.',
+            type: 'error',
+          });
+        }
+      },
+      isLoading: false,
+    });
   };
 
   const handleSave = async (formData, membershipId) => {
     try {
       if (membershipId) {
-        alert("Membership update not supported in this version.");
+        setStatusModal({
+          isOpen: true,
+          title: 'Update Not Supported',
+          message: 'Membership update is not supported in this version.',
+          type: 'error',
+        });
       } else {
         await createOfficerMembership(formData, token);
-        alert("Membership created successfully!");
+        await fetchData();
+        setShowModal(false);
+        setStatusModal({
+          isOpen: true,
+          title: 'Membership Created',
+          message: 'The membership has been created successfully.',
+          type: 'success',
+        });
       }
-      setShowModal(false);
-      const updated = await getOfficerMemberships(token);
-      setMemberships(updated);
     } catch (error) {
-      console.error("Error saving membership:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('officerAccessToken');
-        localStorage.removeItem('officerInfo');
-        navigate('/officer-login');
-      } else {
-        alert(`Error saving membership: ${error.response?.data?.detail || 'Unknown error'}`);
-      }
+      console.error('Error saving membership:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Error Saving Membership',
+        message: error.response?.data?.detail || 'Failed to save membership. Please try again.',
+        type: 'error',
+      });
     }
   };
 
   const handleQRUpload = async (paymentType, file) => {
     try {
       await uploadOfficerQRCode(paymentType, file, token);
-      alert("QR Code uploaded successfully!");
       setShowQRManagementModal(false);
+      setStatusModal({
+        isOpen: true,
+        title: 'QR Code Uploaded',
+        message: 'The QR code has been uploaded successfully.',
+        type: 'success',
+      });
     } catch (error) {
-      console.error("Failed to upload QR code:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('officerAccessToken');
-        localStorage.removeItem('officerInfo');
-        navigate('/officer-login');
-      } else {
-        alert(`Error uploading QR code: ${error.response?.data?.detail || 'Unknown error'}`);
-      }
+      console.error('Failed to upload QR code:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Error Uploading QR Code',
+        message: error.response?.data?.detail || 'Failed to upload QR code. Please try again.',
+        type: 'error',
+      });
     }
   };
 
@@ -187,455 +233,402 @@ const OfficerManageMembershipPage = () => {
     if (!selectedRequirement || !selectedRequirement.requirement) return;
     try {
       await updateOfficerRequirement(selectedRequirement.requirement, { amount }, token);
-      alert("Requirement updated successfully!");
-      const updated = await getOfficerRequirements(token);
-      setRequirements(updated);
+      await fetchData();
       setShowRequirementModal(false);
       setSelectedRequirement(null);
+      setStatusModal({
+        isOpen: true,
+        title: 'Requirement Updated',
+        message: 'The requirement has been updated successfully.',
+        type: 'success',
+      });
     } catch (error) {
-      console.error("Error updating requirement:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('officerAccessToken');
-        localStorage.removeItem('officerInfo');
-        navigate('/officer-login');
-      } else {
-        alert(`Error updating requirement: ${error.response?.data?.detail || 'Unknown error'}`);
-      }
+      console.error('Error updating requirement:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Error Updating Requirement',
+        message: error.response?.data?.detail || 'Failed to update requirement. Please try again.',
+        type: 'error',
+      });
     }
   };
 
-  const handleRequirementArchive = async (requirement) => {
-    if (!window.confirm("Are you sure you want to archive this requirement?")) return;
+  const handleRequirementArchive = (requirement) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Archive Requirement',
+      message: `Are you sure you want to archive the requirement "${requirement}"?`,
+      onConfirm: async () => {
+        setConfirmationModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await deleteOfficerRequirement(requirement, token);
+          await fetchData();
+          setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          setStatusModal({
+            isOpen: true,
+            title: 'Requirement Archived',
+            message: 'The requirement has been archived successfully.',
+            type: 'success',
+          });
+        } catch (error) {
+          console.error('Error archiving requirement:', error);
+          setConfirmationModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+          setStatusModal({
+            isOpen: true,
+            title: 'Error Archiving Requirement',
+            message: error.response?.data?.detail || 'Failed to archive requirement. Please try again.',
+            type: 'error',
+          });
+        }
+      },
+      isLoading: false,
+    });
+  };
+
+  const handleAddRequirement = async (newReq) => {
     try {
-      await deleteOfficerRequirement(requirement, token);
-      alert("Requirement archived successfully!");
-      const updated = await getOfficerRequirements(token);
-      setRequirements(updated);
+      await createOfficerRequirement(newReq, token);
+      await fetchData();
+      setShowAddRequirementModal(false);
+      setStatusModal({
+        isOpen: true,
+        title: 'Requirement Added',
+        message: 'The new requirement has been added successfully.',
+        type: 'success',
+      });
     } catch (error) {
-      console.error("Error archiving requirement:", error);
-      if (error.response?.status === 401) {
-        localStorage.removeItem('officerAccessToken');
-        localStorage.removeItem('officerInfo');
-        navigate('/officer-login');
-      } else {
-        alert(`Error archiving requirement: ${error.response?.data?.detail || 'Unknown error'}`);
-      }
+      console.error('Error adding requirement:', error);
+      setStatusModal({
+        isOpen: true,
+        title: 'Error Adding Requirement',
+        message: error.response?.data?.detail || 'Failed to add requirement. Please try again.',
+        type: 'error',
+      });
     }
   };
 
-  const openReceiptImage = (url) => {
-    window.open(url, '_blank');
+  const openReceiptModal = (url) => {
+    setSelectedReceiptUrl(url);
+    setShowReceiptModal(true);
+  };
+
+  const formatPaymentMethod = (method) => {
+    if (!method) return '-';
+    return method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
+  };
+
+  const formatPrice = (amount) => {
+    if (!amount && amount !== 0) return '-';
+    return `₱${parseFloat(amount).toFixed(2)}`;
   };
 
   const filteredMemberships = memberships.filter((m) => {
-    let statusMatch = true;
-    if (activeTab === 'all') {
-      statusMatch = true;
-    } else if (activeTab === 'verifying') {
-      statusMatch =
-        (m.payment_status && m.payment_status.toLowerCase() === "verifying") ||
-        (m.status && m.status.toLowerCase() === "processing");
-    }
-    const blockMatch = filterBlock === 'All' ? true : (m.user?.block === filterBlock);
-    const yearMatch = filterYear === 'All' ? true : (m.user?.year === filterYear);
-    const reqMatch = filterRequirement === 'All' ? true : (m.requirement === filterRequirement);
+    const statusMatch =
+      activeTab === 'all'
+        ? true
+        : (m.payment_status && m.payment_status.toLowerCase() === 'verifying') ||
+          (m.status && m.status.toLowerCase() === 'processing');
+    const blockMatch = filterBlock === 'All' ? true : m.user?.block === filterBlock;
+    const yearMatch = filterYear === 'All' ? true : m.user?.year === filterYear;
+    const reqMatch = filterRequirement === 'All' ? true : m.requirement === filterRequirement;
     const nameMatch = searchName === '' ? true : m.user?.full_name.toLowerCase().includes(searchName.toLowerCase());
     return statusMatch && blockMatch && yearMatch && reqMatch && nameMatch;
   });
 
+  const uniqueBlocks = [...new Set(memberships.map((m) => m.user?.block).filter(Boolean))].sort();
+  const uniqueYears = [...new Set(memberships.map((m) => m.user?.year).filter(Boolean))].sort();
+  const uniqueRequirements = [...new Set(memberships.map((m) => m.requirement).filter(Boolean))].sort();
+
   if (isLoading) {
-    return <div>Loading Officer Info...</div>;
+    return <Loading message="Loading Officer Info..." />;
   }
 
   return (
     <OfficerLayout>
       <div className="officer-manage-membership-page">
-        <div className="events-grid">
-          <div className="membership-tabs">
-            <button className={activeTab === 'all' ? 'active' : ''} onClick={() => handleTabChange('all')}>
-              Members
-            </button>
-            <button className={activeTab === 'verifying' ? 'active' : ''} onClick={() => handleTabChange('verifying')}>
-              Verifying
-            </button>
-          </div>
-        </div>
+        <header>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--primary-color)' }}>
+            Membership Management
+          </h1>
+        </header>
 
-        <div className="additional-filters">
-          <div className="filter-item">
-            <label>Block:</label>
-            <select value={filterBlock} onChange={(e) => setFilterBlock(e.target.value)}>
-              <option value="All">All</option>
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-            </select>
-          </div>
-          <div className="filter-item">
-            <label>Year:</label>
-            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
-              <option value="All">All</option>
-              <option value="1st Year">1st Year</option>
-              <option value="2nd Year">2nd Year</option>
-              <option value="3rd Year">3rd Year</option>
-              <option value="4th Year">4th Year</option>
-            </select>
-          </div>
-          <div className="filter-item">
-            <label>Requirement:</label>
-            <select value={filterRequirement} onChange={(e) => setFilterRequirement(e.target.value)}>
-              <option value="All">All</option>
-              <option value="1st Semester Membership">1st Semester Membership</option>
-              <option value="2nd Semester Membership">2nd Semester Membership</option>
-            </select>
-          </div>
-          <div className="filter-item">
-            <label>Search Name:</label>
-            <input
-              type="text"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              placeholder="Enter full name..."
-            />
-          </div>
-        </div>
-
-        <table className="membership-table">
-          <thead>
-            <tr>
-              <th>Full Name</th>
-              <th>Block</th>
-              <th>Year</th>
-              <th>Requirement</th>
-              {activeTab === 'verifying' && <th>Receipt Image</th>}
-              <th>Status</th>
-              {activeTab === 'verifying' && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredMemberships.map((m) => (
-              <tr key={m.id}>
-                <td>{m.user?.full_name || '-'}</td>
-                <td>{m.user?.block || '-'}</td>
-                <td>{m.user?.year || '-'}</td>
-                <td>{m.requirement || '-'}</td>
-                {activeTab === 'verifying' && (
-                  <td>
-                    {m.receipt_path ? (
-                      <img
-                        src={m.receipt_path}
-                        alt="Receipt"
-                        width="50"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => openReceiptImage(m.receipt_path)}
-                        onError={() => console.error(`Failed to load receipt image: ${m.receipt_path}`)}
-                      />
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                )}
-                <td>{activeTab === 'verifying' ? (m.status || m.payment_status || '-') : m.payment_status || '-'}</td>
-                {activeTab === 'verifying' && (
-                  <td>
-                    <button onClick={() => handleVerifyAction(m.id, 'approve')}>Approve</button>
-                    <button onClick={() => handleVerifyAction(m.id, 'deny')}>Deny</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="requirement-section">
-          <h2>Membership Requirements</h2>
-          <table className="membership-table">
+        <section className="requirement-section">
+          <table className="requirement-table">
             <thead>
               <tr>
                 <th>Requirement</th>
                 <th>Price</th>
-                <th>Actions</th>
+                <th>Manage</th>
               </tr>
             </thead>
             <tbody>
-              {requirements.map((r) => (
-                <tr key={`req-${r.id}`}>
-                  <td>{r.requirement || '-'}</td>
-                  <td>
-                    <input
-                      type="number"
-                      value={r.amount || ''}
-                      onChange={(e) =>
-                        setSelectedRequirement({ ...r, amount: e.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button onClick={() => { setSelectedRequirement(r); setShowRequirementModal(true); }}>
-                      Edit Price
-                    </button>
-                    <button onClick={() => handleRequirementArchive(r.requirement)}>
-                      Archive
-                    </button>
+              {requirements.length > 0 ? (
+                requirements.map((r) => (
+                  <tr key={`req-${r.id}`}>
+                    <td>{r.requirement || '-'}</td>
+                    <td>{formatPrice(r.amount)}</td>
+                    <td>
+                      <div className="manage-actions" role="group" aria-label="Manage requirement actions">
+                        <button
+                          className="btn-edit-icon"
+                          onClick={() => {
+                            setSelectedRequirement(r);
+                            setShowRequirementModal(true);
+                          }}
+                          aria-label="Edit requirement price"
+                          aria-describedby={`edit-tooltip-${r.id}`}
+                          title="Edit Price"
+                        >
+                          <i className="fas fa-pencil-alt"></i>
+                        </button>
+                        <span id={`edit-tooltip-${r.id}`} className="sr-only">Edit requirement price</span>
+                        <button
+                          className="btn-archive-icon"
+                          onClick={() => handleRequirementArchive(r.requirement)}
+                          aria-label="Archive requirement"
+                          aria-describedby={`archive-tooltip-${r.id}`}
+                          title="Archive"
+                        >
+                          <i className="fas fa-archive"></i>
+                        </button>
+                        <span id={`archive-tooltip-${r.id}`} className="sr-only">Archive requirement</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: '2rem' }}>
+                    No requirements found.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
           <div className="requirement-management">
-            <button
-              className="manage-qr-code-btn"
-              onClick={() => setShowQRManagementModal(true)}
-            >
+            <button className="manage-qr-code-btn" onClick={() => setShowQRManagementModal(true)}>
               Manage QR Code
             </button>
-            <button
-              className="add-requirement-btn"
-              onClick={() => setShowAddRequirementModal(true)}
-            >
+            <button className="add-requirement-btn" onClick={() => setShowAddRequirementModal(true)}>
               Add Requirement
             </button>
           </div>
-        </div>
+        </section>
 
-        <OfficerMembershipModal
-          show={showModal}
-          onClose={() => setShowModal(false)}
-          onSave={handleSave}
-        />
-
-        {showRequirementModal && selectedRequirement && (
-          <OfficerRequirementModal
-            show={showRequirementModal}
-            requirementData={selectedRequirement}
-            onClose={() => { setShowRequirementModal(false); setSelectedRequirement(null); }}
-            onSave={(newAmount) => handleRequirementUpdate(newAmount)}
-          />
-        )}
-
-        {showQRManagementModal && (
-          <OfficerQRManagementModal
-            show={showQRManagementModal}
-            onClose={() => setShowQRManagementModal(false)}
-            onQRUpload={handleQRUpload}
-          />
-        )}
-
-        {showAddRequirementModal && (
-          <OfficerAddRequirementModal
-            show={showAddRequirementModal}
-            onClose={() => setShowAddRequirementModal(false)}
-            onSave={async (newReq) => {
-              try {
-                await createOfficerRequirement(newReq, token);
-                alert("Requirement added successfully!");
-                const updated = await getOfficerRequirements(token);
-                setRequirements(updated);
-                setShowAddRequirementModal(false);
-              } catch (error) {
-                console.error("Error adding requirement:", error);
-                if (error.response?.status === 401) {
-                  localStorage.removeItem('officerAccessToken');
-                  localStorage.removeItem('officerInfo');
-                  navigate('/officer-login');
-                } else {
-                  alert(`Error adding requirement: ${error.response?.data?.detail || 'Unknown error'}`);
-                }
-              }
-            }}
-          />
-        )}
-
-        {showDenialReasonModal && (
-          <OfficerDenialReasonModal
-            show={showDenialReasonModal}
-            onClose={() => { setShowDenialReasonModal(false); setSelectedMembershipId(null); }}
-            onSubmit={handleDenialReasonSubmit}
-          />
-        )}
-      </div>
-    </OfficerLayout>
-  );
-};
-
-const OfficerRequirementModal = ({ show, requirementData, onClose, onSave }) => {
-  const [amount, setAmount] = useState(requirementData.amount || '');
-
-  const handleChange = (e) => {
-    setAmount(e.target.value);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await onSave(amount);
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-container">
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>Edit Requirement: {requirementData.requirement}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label>Price:</label>
-            <input type="number" value={amount} onChange={handleChange} required />
-          </div>
-          <button type="submit">Save Price</button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const OfficerQRManagementModal = ({ show, onClose, onQRUpload }) => {
-  const token = localStorage.getItem('officerAccessToken');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedType, setSelectedType] = useState("paymaya");
-  const [qrPreviewUrl, setQrPreviewUrl] = useState(null);
-  const [qrError, setQrError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchQRCodeData = async () => {
-    setIsLoading(true);
-    setQrError(null);
-    try {
-      const data = await getQRCode(selectedType, token);
-      if (data && data.qr_code_url) {
-        setQrPreviewUrl(data.qr_code_url);
-      } else {
-        setQrPreviewUrl(null);
-        setQrError(`No QR code available for ${selectedType}.`);
-      }
-    } catch (error) {
-      console.error("Failed to fetch QR code:", error);
-      setQrPreviewUrl(null);
-      setQrError(error.response?.data?.detail || `Failed to load QR code for ${selectedType}. Please try again.`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!token || !show) return;
-    fetchQRCodeData();
-  }, [selectedType, token, show]);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file && !file.type.startsWith('image/')) {
-      setQrError("Please select an image file.");
-      setSelectedFile(null);
-      return;
-    }
-    setSelectedFile(file);
-    setQrError(null);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) {
-      setQrError("No file selected.");
-      return;
-    }
-    setIsLoading(true);
-    try {
-      await onQRUpload(selectedType, selectedFile);
-      setSelectedFile(null);
-      setQrError(null);
-      // Refresh QR code preview
-      await fetchQRCodeData();
-    } catch (error) {
-      setQrError(`Failed to upload QR code: ${error.response?.data?.detail || 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-container">
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>Manage QR Code</h2>
-        <div className="qr-code-preview">
-          {isLoading ? (
-            <p>Loading QR code...</p>
-          ) : qrError ? (
-            <p className="qr-error">{qrError}</p>
-          ) : qrPreviewUrl ? (
-            <img 
-              src={qrPreviewUrl} 
-              alt="QR Code Preview" 
-              onError={() => setQrError("Failed to load QR code image. The image may be inaccessible.")} 
-            />
-          ) : (
-            <p>No QR Code Uploaded</p>
-          )}
-        </div>
-        <div className="form-field">
-          <label>Select Payment Type:</label>
-          <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-            <option value="paymaya">PayMaya</option>
-            <option value="gcash">GCash</option>
-          </select>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <input 
-            type="file" 
-            accept="image/*" 
-            onChange={handleFileChange} 
-            disabled={isLoading}
-          />
-          <button type="submit" disabled={!selectedFile || isLoading}>
-            {isLoading ? 'Uploading...' : 'Upload New QR Code'}
+        <section className="membership-tabs">
+          <button className={activeTab === 'all' ? 'active' : ''} onClick={() => handleTabChange('all')}>
+            ALL MEMBERS
           </button>
-        </form>
-      </div>
-    </div>
-  );
-};
+          <button className={activeTab === 'verifying' ? 'active' : ''} onClick={() => handleTabChange('verifying')}>
+            VERIFYING
+          </button>
+        </section>
 
-const OfficerAddRequirementModal = ({ show, onClose, onSave }) => {
-  const [requirement, setRequirement] = useState("1st Semester Membership");
-  const [amount, setAmount] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!amount) return;
-    await onSave({ requirement, amount });
-  };
-
-  if (!show) return null;
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-container">
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>Add Requirement</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label>Requirement:</label>
-            <select value={requirement} onChange={(e) => setRequirement(e.target.value)}>
-              <option value="1st Semester Membership">1st Semester Membership</option>
-              <option value="2nd Semester Membership">2nd Semester Membership</option>
+        <section className="additional-filters">
+          <div className="filter-item">
+            <label>Block</label>
+            <select value={filterBlock} onChange={(e) => setFilterBlock(e.target.value)}>
+              <option value="All">All Blocks</option>
+              {uniqueBlocks.map((block) => (
+                <option key={block} value={block}>
+                  {block}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="form-field">
-            <label>Amount:</label>
-            <input 
-              type="number" 
-              value={amount} 
-              onChange={(e) => setAmount(e.target.value)} 
-              required 
-            />
+          <div className="filter-item">
+            <label>Year</label>
+            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+              <option value="All">All Years</option>
+              {uniqueYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
           </div>
-          <button type="submit">Add Requirement</button>
-        </form>
+          <div className="filter-item">
+            <label>Requirement</label>
+            <select value={filterRequirement} onChange={(e) => setFilterRequirement(e.target.value)}>
+              <option value="All">All Requirements</option>
+              {uniqueRequirements.map((req) => (
+                <option key={req} value={req}>
+                  {req}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-item filter-search">
+            <label>Search Name</label>
+            <div className="search-wrapper">
+              <i className="fas fa-search"></i>
+              <input
+                type="text"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="Enter full name..."
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="table-container">
+          <table className="membership-table">
+            <thead>
+              <tr>
+                <th>Full Name</th>
+                <th>Block</th>
+                <th>Year</th>
+                <th>Requirement</th>
+                <th>Payment Type</th>
+                <th>Payment Date</th>
+                <th>Approval Date</th>
+                {activeTab === 'verifying' && <th>Receipt</th>}
+                <th>Status</th>
+                {activeTab === 'verifying' && <th>Verification</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredMemberships.length > 0 ? (
+                filteredMemberships.map((m) => (
+                  <tr key={m.id}>
+                    <td>{m.user?.full_name || '-'}</td>
+                    <td>{m.user?.block || '-'}</td>
+                    <td>{m.user?.year || '-'}</td>
+                    <td>{m.requirement || '-'}</td>
+                    <td>{formatPaymentMethod(m.payment_method)}</td>
+                    <td>
+                      {m.payment_date
+                        ? new Date(m.payment_date).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })
+                        : '-'}
+                    </td>
+                    <td>
+                      {m.approval_date
+                        ? new Date(m.approval_date).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
+                          })
+                        : '-'}
+                    </td>
+                    {activeTab === 'verifying' && (
+                      <td>
+                        {m.receipt_path ? (
+                          <img
+                            src={m.receipt_path}
+                            alt="Receipt"
+                            width="50"
+                            onClick={() => openReceiptModal(m.receipt_path)}
+                            onError={() => console.error(`Failed to load receipt image: ${m.receipt_path}`)}
+                          />
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    )}
+                    <td>{activeTab === 'verifying' ? (m.status || m.payment_status || '-') : m.payment_status || '-'}</td>
+                    {activeTab === 'verifying' && (
+                      <td>
+                        <div className="verification-actions" role="group" aria-label="Verification actions">
+                          <button
+                            className="btn-approve-icon"
+                            onClick={() => handleVerifyAction(m.id, 'approve')}
+                            aria-label="Approve membership"
+                            aria-describedby={`approve-tooltip-${m.id}`}
+                            title="Approve"
+                          >
+                            <i className="fas fa-check"></i>
+                          </button>
+                          <span id={`approve-tooltip-${m.id}`} className="sr-only">Approve membership</span>
+                          <button
+                            className="btn-deny-icon"
+                            onClick={() => handleVerifyAction(m.id, 'deny')}
+                            aria-label="Deny membership"
+                            aria-describedby={`deny-tooltip-${m.id}`}
+                            title="Deny"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                          <span id={`deny-tooltip-${m.id}`} className="sr-only">Deny membership</span>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={activeTab === 'verifying' ? 10 : 7} style={{ textAlign: 'center', padding: '2rem' }}>
+                    No memberships found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <OfficerMembershipModal show={showModal} onClose={() => setShowModal(false)} onSave={handleSave} />
+        <OfficerRequirementModal
+          show={showRequirementModal}
+          requirementData={selectedRequirement}
+          onClose={() => {
+            setShowRequirementModal(false);
+            setSelectedRequirement(null);
+          }}
+          onSave={handleRequirementUpdate}
+        />
+        <OfficerQRManagementModal
+          show={showQRManagementModal}
+          onClose={() => setShowQRManagementModal(false)}
+          onQRUpload={handleQRUpload}
+        />
+        <OfficerAddRequirementModal
+          show={showAddRequirementModal}
+          onClose={() => setShowAddRequirementModal(false)}
+          onSave={handleAddRequirement}
+        />
+        <OfficerDenialReasonModal
+          show={showDenialReasonModal}
+          onClose={() => {
+            setShowDenialReasonModal(false);
+            setSelectedMembershipId(null);
+          }}
+          onSubmit={handleDenialReasonSubmit}
+        />
+        <ReceiptModal
+          show={showReceiptModal}
+          receiptUrl={selectedReceiptUrl}
+          onClose={() => setShowReceiptModal(false)}
+        />
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+          title={statusModal.title}
+          message={statusModal.message}
+          type={statusModal.type}
+        />
+        <ConfirmationModal
+          isOpen={confirmationModal.isOpen}
+          onClose={() => setConfirmationModal((prev) => ({ ...prev, isOpen: false }))}
+          onConfirm={confirmationModal.onConfirm}
+          title={confirmationModal.title}
+          message={confirmationModal.message}
+          confirmText="Confirm"
+          cancelText="Cancel"
+          type="danger"
+          isLoading={confirmationModal.isLoading}
+        />
       </div>
-    </div>
+    </OfficerLayout>
   );
 };
 

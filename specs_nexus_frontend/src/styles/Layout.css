@@ -3,7 +3,7 @@
   height: 100vh;
   background-color: #f9f9f9;
   position: relative;
-  overflow: hidden; /* Prevent scroll on the container itself */
+  overflow: hidden;
 }
 
 .main-content {
@@ -12,16 +12,26 @@
   flex-direction: column;
   transition: margin-left 0.3s ease;
   width: 100%;
-  height: 100vh; /* Full height */
-  overflow: hidden; /* Hide overflow to prevent double scrollbars */
+  height: 100vh;
+  overflow: hidden;
 }
 
 .content-wrapper {
   flex: 1;
-  padding: 1.5rem;
-  overflow-y: auto; /* Enable scroll on this wrapper */
-  -webkit-overflow-scrolling: touch; /* Better scroll on iOS */
-  height: calc(100vh - 60px); /* Subtract header height - adjust if needed */
+  padding: .75rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: calc(100vh - 60px);
+}
+
+.sidebar-overlay-ss {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 99;
 }
 
 /* Desktop defaults */
@@ -58,16 +68,5 @@
   
   .layout-container.sidebar-open .main-content {
     margin-left: 0;
-  }
-  
-  .layout-container.sidebar-open::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 99;
   }
 }

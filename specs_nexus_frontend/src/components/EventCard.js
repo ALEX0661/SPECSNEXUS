@@ -69,7 +69,7 @@ const EventCard = ({ event, onClick }) => {
               event.image_url
                 ? (event.image_url.startsWith("http")
                   ? event.image_url
-                  : `http://localhost:8000${event.image_url}`)
+                  : `https://specs-nexus-production.up.railway.app${event.image_url}`)
                 : "/default_event.png"
             } 
             alt={event.title} 
@@ -90,7 +90,7 @@ const EventCard = ({ event, onClick }) => {
         
         {/* Event content */}
         <div className="event-content">
-          <h3 className="event-title">{truncateText(event.title, 40)}</h3>
+          <h3 className="events-title">{truncateText(event.title, 40)}</h3>
           
           <div className="event-info">
             <div className="event-info-item">

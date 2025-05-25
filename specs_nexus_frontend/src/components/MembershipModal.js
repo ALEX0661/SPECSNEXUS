@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/MembershipModal.css';
 import { getQRCode, uploadReceiptFile, updateMembershipReceipt } from '../services/membershipService';
+import StatusModal from './StatusModal';
 
 const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
   const [selectedReceipt, setSelectedReceipt] = useState(null);
@@ -12,10 +13,23 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isReceiptLoading, setIsReceiptLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentMembership, setCurrentMembership] = useState(membership);
+  const [showFullReceiptModal, setShowFullReceiptModal] = useState(false);
+  const [fullReceiptUrl, setFullReceiptUrl] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [pendingUpdateResponse, setPendingUpdateResponse] = useState(null);
   const token = localStorage.getItem('accessToken');
   const fileInputRef = useRef(null);
 
   const paymentMethods = ["paymaya", "gcash"];
+  const expectedDomain = "specsnexus-images.senya-videos.workers.dev";
+
+  const isPaid = currentMembership.payment_status?.toLowerCase() === "paid";
+  const isDenied = currentMembership.payment_status?.toLowerCase() === "not paid" && currentMembership.denial_reason;
+
+  useEffect(() => {
+    setCurrentMembership(membership);
+  }, [membership]);
 
   const fetchQRCodeData = async () => {
     setIsLoading(true);
@@ -38,30 +52,39 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
   };
 
   useEffect(() => {
-    if (membership.payment_status?.toLowerCase() !== "paid") {
+    if (!isPaid) {
       fetchQRCodeData();
     }
-  }, [activeTab, token, membership]);
+  }, [activeTab, token, currentMembership, isPaid]);
 
   useEffect(() => {
-    if (membership.receipt_path) {
+    if (currentMembership.receipt_path && !selectedReceipt) {
       setIsReceiptLoading(true);
-      const trimmedPath = membership.receipt_path.trim();
+      const trimmedPath = currentMembership.receipt_path.trim();
+      console.log("Receipt path received:", trimmedPath);
+
       try {
-        new URL(trimmedPath);
-        setReceiptPreviewUrl(trimmedPath);
-        setQrError(null);
-      } catch {
-        setQrError("Invalid receipt image URL.");
+        const url = new URL(trimmedPath);
+        if (url.hostname !== expectedDomain) {
+          console.warn(`Receipt URL domain mismatch. Expected: ${expectedDomain}, Got: ${url.hostname}`);
+          setQrError(`Invalid receipt URL domain. Please contact support.`);
+          setReceiptPreviewUrl(null);
+        } else {
+          setReceiptPreviewUrl(trimmedPath);
+          setQrError(null);
+        }
+      } catch (error) {
+        console.error("Invalid receipt URL:", trimmedPath, error);
+        setQrError("Invalid receipt URL format. Please contact support.");
         setReceiptPreviewUrl(null);
       } finally {
         setIsReceiptLoading(false);
       }
-    } else {
+    } else if (!selectedReceipt) {
       setReceiptPreviewUrl(null);
       setIsReceiptLoading(false);
     }
-  }, [membership]);
+  }, [currentMembership.receipt_path, selectedReceipt]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -69,7 +92,9 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
       if (!file.type.startsWith('image/')) {
         setQrError("Please select an image file.");
         setSelectedReceipt(null);
-        setReceiptPreviewUrl(null);
+        if (!currentMembership.receipt_path) {
+          setReceiptPreviewUrl(null);
+        }
         return;
       }
       setSelectedReceipt(file);
@@ -98,25 +123,38 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
         });
       }, 300);
 
-      const uploadResponse = await uploadReceiptFile(selectedReceipt, token);
+      const sanitizedFileName = selectedReceipt.name.replace(/\s+/g, '_');
+      const sanitizedFile = new File([selectedReceipt], sanitizedFileName, {
+        type: selectedReceipt.type,
+        lastModified: selectedReceipt.lastModified,
+      });
+      console.log("Uploading file with sanitized name:", sanitizedFileName);
+
+      const uploadResponse = await uploadReceiptFile(sanitizedFile, token);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
       
       const updatePayload = {
-        membership_id: membership.id,
+        membership_id: currentMembership.id,
         payment_type: activeTab.toLowerCase(),
         receipt_path: uploadResponse.file_path,
       };
       const updateResponse = await updateMembershipReceipt(updatePayload, token);
       
+      const updatedMembership = {
+        ...currentMembership,
+        receipt_path: uploadResponse.file_path,
+        payment_method: activeTab.toLowerCase()
+      };
+      setCurrentMembership(updatedMembership);
+      
       setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
         setSelectedReceipt(null);
-        setReceiptPreviewUrl(null);
-        onReceiptUploaded(updateResponse);
-        alert("Receipt uploaded successfully!");
+        setPendingUpdateResponse(updateResponse);
+        setShowStatusModal(true);
       }, 500);
       
     } catch (error) {
@@ -124,6 +162,14 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
       setUploadProgress(0);
       console.error("Receipt upload error:", error);
       setQrError(`Failed to upload receipt: ${error.response?.data?.detail || 'Unknown error'}`);
+    }
+  };
+
+  const handlePaymentCompletedClose = () => {
+    setShowStatusModal(false);
+    if (pendingUpdateResponse) {
+      onReceiptUploaded(pendingUpdateResponse);
+      setPendingUpdateResponse(null);
     }
   };
 
@@ -151,203 +197,296 @@ const MembershipModal = ({ membership, onClose, onReceiptUploaded }) => {
     return date ? new Date(date).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : "N/A";
   };
 
-  // Function to open receipt in a new tab
-  const openReceiptImage = (url) => {
-    window.open(url, '_blank');
+  const openFullReceiptModal = (url) => {
+    if (url) {
+      setFullReceiptUrl(url);
+      setShowFullReceiptModal(true);
+    }
   };
 
-  return (
-    <div className="modal-overlay" onClick={(e) => e.target.className === "modal-overlay" && onClose()}>
-      <div className="modal-container">
-        <div className="payment-header">
-          <div className="payment-name">
-            {membership.payment_status?.toLowerCase() === "paid" ? "Membership Details" : getPaymentMethodLabel(activeTab)}
-          </div>
-          <button className="close-button" onClick={onClose} aria-label="Close">×</button>
+  const closeFullReceiptModal = () => {
+    setShowFullReceiptModal(false);
+    setFullReceiptUrl(null);
+  };
+
+  const handleReceiptImageError = () => {
+    console.error("Failed to load receipt image from:", receiptPreviewUrl);
+    setQrError("Failed to load receipt image. The image may be corrupted or no longer available.");
+    setReceiptPreviewUrl(null);
+  };
+
+  const ReceiptPreview = ({ label, receiptUrl }) => (
+    <div className="receipt-preview-container">
+      <p className="receipt-label"><strong>{label}:</strong></p>
+      {isReceiptLoading ? (
+        <div className="receipt-loading">Loading receipt...</div>
+      ) : receiptUrl ? (
+        <div className="receipt-image-container">
+          <img 
+            src={receiptUrl} 
+            alt={label} 
+            className="receipt-preview" 
+            onClick={() => openFullReceiptModal(receiptUrl)}
+            onError={handleReceiptImageError}
+          />
+          <p className="receipt-hint">Click to view full size</p>
         </div>
-        
-        {membership.payment_status?.toLowerCase() === "paid" ? (
-          <div className="membership-details-section">
-            <h3 className="details-title">Membership Details</h3>
-            <div className="details-grid">
-              <div className="detail-card">
-                <span className="detail-label">Requirement:</span>
-                <span className="detail-value">{membership.requirement || "N/A"}</span>
-              </div>
-              <div className="detail-card">
-                <span className="detail-label">Amount:</span>
-                <span className="detail-value">₱{membership.amount || "0"}</span>
-              </div>
-              <div className="detail-card">
-                <span className="detail-label">Payment Method:</span>
-                <span className="detail-value">{membership.payment_method ? getPaymentMethodLabel(membership.payment_method) : "N/A"}</span>
-              </div>
-              <div className="detail-card">
-                <span className="detail-label">Payment Date:</span>
-                <span className="detail-value">{formatDate(membership.payment_date)}</span>
-              </div>
-              <div className="detail-card">
-                <span className="detail-label">Approval Date:</span>
-                <span className="detail-value">{formatDate(membership.approval_date)}</span>
-              </div>
+      ) : (
+        <div className="receipt-placeholder">
+          Receipt image not available.
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="modal-overlay" onClick={(e) => {
+        if (e.target.className === "modal-overlay" && !showStatusModal) {
+          onClose();
+        }
+      }}>
+        <div className="modal-container">
+          <div className="payment-header">
+            <div className="payment-name">
+              {isPaid ? "Membership Details" : getPaymentMethodLabel(activeTab)}
             </div>
-            {membership.receipt_path && (
-              <div className="receipt-preview-container">
-                <p className="receipt-label"><strong>Receipt:</strong></p>
-                {isReceiptLoading ? (
-                  <div className="receipt-loading">Loading receipt...</div>
-                ) : receiptPreviewUrl ? (
-                  <img 
-                    src={receiptPreviewUrl} 
-                    alt="Receipt Preview" 
-                    className="receipt-preview" 
-                    style={{ width: '100px', cursor: 'pointer' }} // Thumbnail size and clickable cursor
-                    onClick={() => openReceiptImage(receiptPreviewUrl)} // Open in new tab
-                    onError={() => {
-                      setQrError("Failed to load receipt image. Please try again or contact support.");
-                      setReceiptPreviewUrl(null);
-                    }} 
-                  />
-                ) : (
-                  <div className="receipt-placeholder">Receipt image not available. Contact support if this persists.</div>
-                )}
-              </div>
-            )}
+            <button className="close-buttons" onClick={onClose} aria-label="Close">×</button>
           </div>
-        ) : (
-          <div className={membership.payment_status?.toLowerCase() === "denied" ? "denial-section" : ""}>
-            {membership.payment_status?.toLowerCase() === "denied" && (
-              <div className="denial-details">
-                <h3 className="details-title">Payment Denied</h3>
-                <div className="details-grid">
-                  <div className="detail-card">
-                    <span className="detail-label">Requirement:</span>
-                    <span className="detail-value">{membership.requirement || "N/A"}</span>
-                  </div>
-                  <div className="detail-card">
-                    <span className="detail-label">Amount:</span>
-                    <span className="detail-value">₱{membership.amount || "0"}</span>
-                  </div>
-                  <div className="detail-card">
-                    <span className="detail-label">Denial Reason:</span>
-                    <span className="detail-value denial-reason">{membership.denial_reason || "No reason provided"}</span>
-                  </div>
+          
+          {isPaid ? (
+            <div className="membership-details-section">
+              <h3 className="details-title">Membership Details</h3>
+              <div className="details-grid">
+                <div className="detail-card">
+                  <span className="detail-label">Requirement:</span>
+                  <span className="detail-value">{currentMembership.requirement || "N/A"}</span>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Amount:</span>
+                  <span className="detail-value">₱{currentMembership.amount || "0"}</span>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Payment Method:</span>
+                  <span className="detail-value">{currentMembership.payment_method ? getPaymentMethodLabel(currentMembership.payment_method) : "N/A"}</span>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Payment Date:</span>
+                  <span className="detail-value">{formatDate(currentMembership.payment_date)}</span>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Approval Date:</span>
+                  <span className="detail-value">{formatDate(currentMembership.approval_date)}</span>
                 </div>
               </div>
-            )}
-            <div className="qr-container">
-              {isLoading ? (
-                <div className="qr-loading">Loading QR code...</div>
-              ) : qrError ? (
-                <div className="qr-error">{qrError}</div>
-              ) : qrPreviewUrl ? (
-                <>
-                  <div className="scan-badge">SCAN ME</div>
-                  <img 
-                    src={qrPreviewUrl} 
-                    alt="QR Code" 
-                    className="qr-image" 
-                    onError={() => setQrError(`Failed to load QR code image for ${activeTab}.`)} 
-                  />
-                </>
-              ) : (
-                <div className="qr-placeholder">No QR Code available</div>
+              
+              {currentMembership.receipt_path && (
+                <ReceiptPreview label="Receipt" receiptUrl={receiptPreviewUrl} />
+              )}
+            </div>
+          ) : (
+            <div className={isDenied ? "denial-section" : ""}>
+              {isDenied && (
+                <div className="denial-details">
+                  <h3 className="details-title">Payment Denied</h3>
+                  <div className="details-grid">
+                    <div className="detail-card">
+                      <span className="detail-label">Requirement:</span>
+                      <span className="detail-value">{currentMembership.requirement || "N/A"}</span>
+                    </div>
+                    <div className="detail-card">
+                      <span className="detail-label">Amount:</span>
+                      <span className="detail-value">₱{currentMembership.amount || "0"}</span>
+                    </div>
+                    <div className="detail-card">
+                      <span className="detail-label">Denial Reason:</span>
+                      <span className="detail-value denial-reason">{currentMembership.denial_reason || "No reason provided"}</span>
+                    </div>
+                  </div>
+                </div>
               )}
               
-              {paymentMethods.length > 1 && (
-                <div className="navigation-arrows">
-                  <button 
-                    className="nav-arrow left" 
-                    onClick={switchToPrevious} 
-                    aria-label="Previous" 
-                    disabled={isLoading}
-                  >
+              {currentMembership.receipt_path && !selectedReceipt && (
+                <>
+                  <div className="membership-details-section">
+                    <h3 className="details-title">Payment Details</h3>
+                    <div className="details-grid">
+                      <div className="detail-card">
+                        <span className="detail-label">Requirement:</span>
+                        <span className="detail-value">{currentMembership.requirement || "N/A"}</span>
+                      </div>
+                      <div className="detail-card">
+                        <span className="detail-label">Amount:</span>
+                        <span className="detail-value">₱{currentMembership.amount || "0"}</span>
+                      </div>
+                      <div className="detail-card">
+                        <span className="detail-label">Payment Method:</span>
+                        <span className="detail-value">{currentMembership.payment_method ? getPaymentMethodLabel(currentMembership.payment_method) : "N/A"}</span>
+                      </div>
+                      <div className="detail-card">
+                        <span className="detail-label">Payment Date:</span>
+                        <span className="detail-value">{formatDate(currentMembership.payment_date)}</span>
+                      </div>
+                      <div className="detail-card">
+                        <span className="detail-label">Approval Date:</span>
+                        <span className="detail-value">{formatDate(currentMembership.approval_date)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <ReceiptPreview label="Current Receipt" receiptUrl={receiptPreviewUrl} />
+                </>
+              )}
+              
+              <div className="qr-container">
+                {isLoading ? (
+                  <div className="qr-loading">Loading QR code...</div>
+                ) : qrError && !receiptPreviewUrl ? (
+                  <div className="qr-error">{qrError}</div>
+                ) : qrPreviewUrl ? (
+                  <>
+                    <div className="scan-badge">SCAN ME</div>
+                    <img 
+                      src={qrPreviewUrl} 
+                      alt="QR Code" 
+                      className="qr-image" 
+                      onError={() => setQrError(`Failed to load QR code image for ${activeTab}.`)} 
+                    />
+                  </>
+                ) : (
+                  <div className="qr-placeholder">No QR Code available</div>
+                )}
+                
+                {paymentMethods.length > 1 && (
+                  <div className="navigation-arrows">
+                    <button 
+                      className="nav-arrow left" 
+                      onClick={switchToPrevious} 
+                      aria-label="Previous" 
+                      disabled={isLoading}
+                    >
                     &lt;
-                  </button>
-                  <button 
-                    className="nav-arrow right" 
-                    onClick={switchToNext} 
-                    aria-label="Next" 
-                    disabled={isLoading}
-                  >
+                    </button>
+                    <button 
+                      className="nav-arrow right" 
+                      onClick={switchToNext} 
+                      aria-label="Next" 
+                      disabled={isLoading}
+                    >
                     &gt;
-                  </button>
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="instruction-section">
+                <h3>Instructions</h3>
+                <ol className="instruction-steps">
+                  <li>Scan the QR code with your {getPaymentMethodLabel(activeTab)} app</li>
+                  <li>Complete the payment for {currentMembership.requirement || "membership"}</li>
+                  <li>Take a screenshot of your receipt</li>
+                  <li>Upload the receipt below</li>
+                </ol>
+              </div>
+              
+              <div className="upload-section">
+                <div className="upload-label">
+                  {currentMembership.receipt_path ? 'Upload New Payment Receipt' : 'Upload Payment Receipt'}
+                </div>
+                <button 
+                  className="upload-button" 
+                  onClick={handleUploadClick} 
+                  disabled={isUploading || isLoading}
+                >
+                  <span className="upload-icon">+</span>
+                  <span>{selectedReceipt ? 'CHANGE FILE' : 'UPLOAD'}</span>
+                </button>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleFileChange} 
+                  style={{ display: 'none' }} 
+                  ref={fileInputRef} 
+                  disabled={isUploading || isLoading}
+                />
+              </div>
+              
+              {selectedReceipt && receiptPreviewUrl && (
+                <div className="receipt-preview-container">
+                  <p className="receipt-label"><strong>New Receipt Preview:</strong></p>
+                  <div className="receipt-image-container">
+                    <img 
+                      src={receiptPreviewUrl} 
+                      alt="Receipt Preview" 
+                      className="receipt-preview" 
+                      onClick={() => openFullReceiptModal(receiptPreviewUrl)}
+                      onError={() => {
+                        setQrError("Failed to load receipt preview image.");
+                        setReceiptPreviewUrl(null);
+                      }} 
+                    />
+                    <p className="receipt-hint">Click to view full size</p>
+                  </div>
+                  
+                  {isUploading ? (
+                    <div className="upload-progress-container">
+                      <div className="upload-progress-bar">
+                        <div 
+                          className="upload-progress-fill" 
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                      <div className="upload-progress-text">
+                        Uploading... {uploadProgress}%
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      className="submit-receipt-btn" 
+                      onClick={handleSubmit}
+                      disabled={isLoading}
+                    >
+                      Submit Receipt
+                    </button>
+                  )}
+                </div>
+              )}
+              
+              {qrError && !receiptPreviewUrl && (
+                <div className="error-message">
+                  {qrError}
                 </div>
               )}
             </div>
-            <div className="instruction-section">
-              <h3>Instructions</h3>
-              <ol className="instruction-steps">
-                <li>Scan the QR code with your {getPaymentMethodLabel(activeTab)} app</li>
-                <li>Complete the payment for {membership.requirement || "membership"}</li>
-                <li>Take a screenshot of your receipt</li>
-                <li>Upload the receipt below</li>
-              </ol>
-            </div>
-            <div className="upload-section">
-              <div className="upload-label">Upload Payment Receipt</div>
-              <button 
-                className="upload-button" 
-                onClick={handleUploadClick} 
-                disabled={isUploading || isLoading}
-              >
-                <span className="upload-icon">+</span>
-                <span>{selectedReceipt ? 'CHANGE FILE' : 'UPLOAD'}</span>
-              </button>
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleFileChange} 
-                style={{ display: 'none' }} 
-                ref={fileInputRef} 
-                disabled={isUploading || isLoading}
-              />
-            </div>
-            {receiptPreviewUrl && (
-              <div className="receipt-preview-container">
+          )}
+
+          {showFullReceiptModal && (
+            <div className="modal-overlay full-receipt-overlay" onClick={closeFullReceiptModal}>
+              <div className="full-recept-modal">
+                <div className="full-receipt-header">
+                  <button className="close-buttons" onClick={closeFullReceiptModal} aria-label="Close">×</button>
+                </div>
                 <img 
-                  src={receiptPreviewUrl} 
-                  alt="Receipt Preview" 
-                  className="receipt-preview" 
-                  style={{ width: '100px', cursor: 'pointer' }} // Thumbnail size and clickable cursor
-                  onClick={() => openReceiptImage(receiptPreviewUrl)} // Open in new tab
+                  src={fullReceiptUrl} 
+                  alt="Full Receipt" 
+                  className="full-receipt-image"
                   onError={() => {
-                    setQrError("Failed to load receipt preview image.");
-                    setReceiptPreviewUrl(null);
-                  }} 
+                    setQrError("Failed to load full receipt image.");
+                    closeFullReceiptModal();
+                  }}
                 />
-                {isUploading ? (
-                  <div className="progress-container">
-                    <div className="progress-bar">
-                      <div 
-                        className="progress-fill" 
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                    <div className="progress-text">
-                      Uploading... {uploadProgress}%
-                    </div>
-                  </div>
-                ) : (
-                  <button 
-                    className="submit-receipt-btn" 
-                    onClick={handleSubmit}
-                    disabled={isLoading}
-                  >
-                    Submit Receipt
-                  </button>
-                )}
               </div>
-            )}
-            {qrError && (
-              <div className="error-message">
-                {qrError}
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      <StatusModal 
+        isOpen={showStatusModal}
+        onClose={handlePaymentCompletedClose}
+        title="Payment Updated"
+        message="Your payment receipt has been successfully uploaded."
+      />
+    </>
   );
 };
 

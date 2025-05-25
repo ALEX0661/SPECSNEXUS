@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import '../styles/AnnouncementModal.css';
 
-const backendBaseUrl = "http://localhost:8000";
+const backendBaseUrl = "https://specs-nexus-production.up.railway.app";
 
 const AnnouncementModal = ({ announcement, onClose }) => {
   const [showFullImage, setShowFullImage] = useState(false);

@@ -223,6 +223,26 @@ html, body {
   box-shadow: 0 0 0 2px rgba(75, 83, 32, 0.2);
 }
 
+.password-container {
+  position: relative;
+  width: 100%;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 40%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #4B5320;
+  font-size: 1.2rem;
+  transition: color 0.3s;
+}
+
+.password-toggle:hover {
+  color: #3a4218;
+}
+
 .error {
   color: #e53935;
   text-align: center;

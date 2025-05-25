@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { getProfile } from '../services/userService';
 import { getAnnouncements } from '../services/announcementService';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AnnouncementModal from '../components/AnnouncementModal';
 import Layout from '../components/Layout';
+import Loading from '../components/Loading';
 import '../styles/AnnouncementsPage.css';
 
 const AnnouncementsPage = () => {
@@ -14,6 +16,7 @@ const AnnouncementsPage = () => {
   const [isAnnouncementsLoading, setIsAnnouncementsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const token = localStorage.getItem('accessToken');
+  const navigate = useNavigate(); // Initialize navigate
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -69,16 +72,12 @@ const AnnouncementsPage = () => {
   const filteredAnnouncements = filterAnnouncements();
 
   if (isLoading) {
-    return (
-      <div className="loading">
-        <div className="loader"></div>
-        <p>Loading Announcements...</p>
-      </div>
-    );
+    return <Loading message="Loading Announcements..." />;
   }
 
   if (!user) {
-    return <div className="error-message">Unable to load user. Please try again.</div>;
+    navigate('/'); // Redirect to login page
+    return null; // Prevent rendering anything else
   }
 
   return (
@@ -110,10 +109,7 @@ const AnnouncementsPage = () => {
 
         <div className="announcements-section">
           {isAnnouncementsLoading ? (
-            <div className="announcements-loading">
-              <div className="loader"></div>
-              <p>Loading announcements...</p>
-            </div>
+            <Loading message="Loading Announcements.." />
           ) : filteredAnnouncements.length > 0 ? (
             <div className="announcements-grid">
               {filteredAnnouncements.map((announcement) => (

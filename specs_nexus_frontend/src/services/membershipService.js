@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://specs-nexus-production.up.railway.app';
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -55,6 +55,15 @@ export async function uploadReceiptFile(file, token) {
 
 export async function updateMembershipReceipt(data, token) {
   const response = await apiClient.put(`/membership/update_receipt`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.data;
+}
+
+// Add this function to your membershipService.js
+
+export async function getMembershipReceipt(membershipId, token) {
+  const response = await apiClient.get(`/membership/receipt/${membershipId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return response.data;

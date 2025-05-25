@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { getClearance } from '../services/clearanceService';
 import { getProfile } from '../services/userService';
 import Layout from '../components/Layout';
-import { FaSpinner, FaExclamationTriangle } from 'react-icons/fa';
+import Loading from '../components/Loading';
 import '../styles/DashboardPage.css';
 
 const DashboardPage = () => {
   const [user, setUser] = useState(null);
   const [clearanceData, setClearanceData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const token = localStorage.getItem('accessToken');
+  const navigate = useNavigate(); // Initialize navigate
 
   useEffect(() => {
     async function fetchUserProfile() {
@@ -19,43 +20,35 @@ const DashboardPage = () => {
         const userProfile = await getProfile(token);
         setUser(userProfile);
         
-        // After getting user profile, fetch clearance data
         if (userProfile && userProfile.id) {
           try {
             const data = await getClearance(userProfile.id, token);
             setClearanceData(data);
           } catch (err) {
             console.error('Failed to fetch clearance:', err);
-            setError('Failed to load clearance data. Please try again later.');
+            // Optionally handle clearance fetch error differently
           }
         }
         
         setLoading(false);
       } catch (err) {
         console.error('Failed to fetch user profile:', err);
-        setError('Failed to load user profile. Please try again later.');
-        setLoading(false);
+        localStorage.removeItem('accessToken'); // Clear invalid token
+        navigate('/'); // Redirect to login page on profile fetch failure
       }
     }
     
     fetchUserProfile();
-  }, [token]);
+  }, [token, navigate]); // Add navigate to dependency array
 
   const renderContent = () => {
     if (loading) {
-      return (
-        <div className="loading-spinner">
-          <FaSpinner className="spin-animation" /> Loading dashboard data...
-        </div>
-      );
+      return <Loading message="Loading dashboard data..." />;
     }
 
-    if (error) {
-      return (
-        <div className="error-message">
-          <FaExclamationTriangle /> {error}
-        </div>
-      );
+    if (!user) {
+      navigate('/'); // Redirect to login page if user is null
+      return null; // Prevent rendering anything else
     }
 
     return (
@@ -98,7 +91,7 @@ const DashboardPage = () => {
             )}
           </div>
           
-          <div className="membership-card">
+          <div className="membership-cards">
             <h3>Membership Fee Status Description</h3>
             <table className="membership-table">
               <thead>
@@ -136,5 +129,5 @@ const DashboardPage = () => {
     </Layout>
   );
 };
- 
+
 export default DashboardPage;
