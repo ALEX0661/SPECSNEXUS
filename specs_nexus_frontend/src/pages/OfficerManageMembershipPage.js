@@ -480,6 +480,7 @@ const OfficerManageMembershipPage = () => {
                 <th>Block</th>
                 <th>Year</th>
                 <th>Requirement</th>
+                <th>Price</th>
                 <th>Payment Type</th>
                 <th>Payment Date</th>
                 <th>Approval Date</th>
@@ -496,6 +497,7 @@ const OfficerManageMembershipPage = () => {
                     <td>{m.user?.block || '-'}</td>
                     <td>{m.user?.year || '-'}</td>
                     <td>{m.requirement || '-'}</td>
+                    <td>{formatPrice(m.amount)}</td>
                     <td>{formatPaymentMethod(m.payment_method)}</td>
                     <td>
                       {m.payment_date
@@ -567,7 +569,7 @@ const OfficerManageMembershipPage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={activeTab === 'verifying' ? 10 : 7} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <td colSpan={activeTab === 'verifying' ? 11 : 8} style={{ textAlign: 'center', padding: '2rem' }}>
                     No memberships found.
                   </td>
                 </tr>
